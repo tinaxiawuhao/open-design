@@ -731,6 +731,14 @@ gh pr create --fill
 
 [skill]: https://docs.anthropic.com/en/docs/claude-code/skills
 
+```shell
+# Windows PowerShell
+pnpm --filter @open-design/tools-dev build
+export OD_ALLOWED_INTERNAL_HOSTS="gpt.cosmoplat.com"
+启动	pnpm tools-dev 或 pnpm tools-dev start web
+关闭	pnpm tools-dev stop
+重启	pnpm tools-dev restart
+```
 ## 许可证
 
 Apache-2.0。打包的 `design-templates/guizang-ppt/` 保留其原始 [LICENSE](../../design-templates/guizang-ppt/LICENSE)（MIT，[@op7418](https://github.com/op7418)）。打包的 `design-templates/html-ppt/` 保留其原始 [LICENSE](../../design-templates/html-ppt/LICENSE)（MIT，[@lewislulu](https://github.com/lewislulu)）。

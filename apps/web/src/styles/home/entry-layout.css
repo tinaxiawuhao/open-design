@@ -789,6 +789,7 @@
    chips to square icon buttons; the full label surfaces as a
    downward hover tooltip. Keeps the entry topbar quiet and tidy.
    ============================================================ */
+.entry-main__topbar-chips--icon-only .entry-workspace-chip,
 .entry-main__topbar-chips--icon-only .entry-discord-badge,
 .entry-main__topbar-chips--icon-only .use-everywhere-chip,
 .entry-main__topbar-chips--icon-only .inline-switcher__chip {
@@ -808,6 +809,7 @@
    badge also carries a "· {n} online" suffix; collapsed it must hide too,
    otherwise the separator + count leak out of the 32px square and render as
    clipped text (e.g. "212 在s"). The full label lives in the hover tooltip. */
+.entry-main__topbar-chips--icon-only .entry-workspace-chip__label,
 .entry-main__topbar-chips--icon-only .entry-discord-badge__label,
 .entry-main__topbar-chips--icon-only .entry-discord-badge__sep,
 .entry-main__topbar-chips--icon-only .entry-discord-badge__online,
@@ -818,6 +820,7 @@
 }
 
 /* Center the surviving icon wrappers inside the square. */
+.entry-main__topbar-chips--icon-only .entry-workspace-chip__icon,
 .entry-main__topbar-chips--icon-only .use-everywhere-chip__icon,
 .entry-main__topbar-chips--icon-only .inline-switcher__chip-icon {
   margin: 0;

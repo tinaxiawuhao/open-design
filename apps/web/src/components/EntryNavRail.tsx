@@ -9,7 +9,6 @@
 // floating settings cog in the top-right corner of the main content.
 
 import { useEffect, useRef, type ReactNode } from 'react';
-import { EntryHelpMenu } from './EntryHelpMenu';
 import { Icon } from './Icon';
 import { useT } from '../i18n';
 import { LIBRARY_UI_VISIBLE } from '../features/libraryUi';
@@ -209,7 +208,6 @@ export function EntryNavRail({
       </div>
       <div className="entry-nav-rail__footer">
         <div className="entry-nav-rail__divider" role="separator" />
-        <EntryHelpMenu />
       </div>
     </nav>
   );
