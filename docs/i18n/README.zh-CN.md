@@ -337,7 +337,13 @@ Sealos App Store 模板会运行已发布的 Open Design Docker 镜像，提供�
 git clone https://github.com/nexu-io/open-design.git
 cd open-design
 corepack enable && pnpm install
-pnpm tools-dev run web
+pnpm tools-dev stop
+pnpm tools-dev run web --daemon-port 17456 --web-port 17573
+# 用 OD_HOST=0.0.0.0 绑定所有网络接口
+# 带上 API Key 重启
+nohup env COSMO_API_KEY="sk-32d2b1876f3a175687bad4936fde6cce" OD_HOST=0.0.0.0  pnpm tools-dev run web --daemon-port 17456 --web-port 17573 > ~/open-design.log 2>&1 &
+# 持久化建议加到 ~/.bashrc：
+echo 'export COSMO_API_KEY="sk-32d2b1876f3a175687bad4936fde6cce"' >> ~/.bashrc
 ```
 
 打开 `tools-dev` 打印的 URL；除非显式传入端口参数，开发端口会动态分配。

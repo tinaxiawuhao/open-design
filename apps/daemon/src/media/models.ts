@@ -69,6 +69,18 @@ export const MEDIA_PROVIDERS: MediaProvider[] = [
     docsUrl: 'https://docs.senseaudio.cn',
   },
   {
+    id: 'zhipu',
+    label: 'Zhipu BigModel',
+    hint: 'CogView-3-Flash · CogVideoX-Flash',
+    integrated: true,
+    credentialsRequired: true,
+    settingsVisible: true,
+    defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    docsUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
+    supportsCustomModel: true,
+    customModelPlaceholder: 'cogview-3-flash or cogvideox-flash',
+  },
+  {
     id: 'aihubmix',
     label: 'AIHubMix',
     hint: 'OpenAI-compatible aggregator · image + speech',
@@ -99,6 +111,8 @@ export const IMAGE_MODELS: MediaModel[] = [
   { id: 'senseaudio-image-2.0-260319', label: 'senseaudio-image-2.0', hint: 'SenseAudio · multi-aspect, latest', provider: 'senseaudio', caps: ['t2i', 'i2i'] },
   { id: 'senseaudio-image-1.0-260319', label: 'senseaudio-image-1.0', hint: 'SenseAudio · standard', provider: 'senseaudio', caps: ['t2i', 'i2i'] },
   { id: 'doubao-seedream-5-0-260128', label: 'seedream-5.0', hint: 'SenseAudio · ByteDance Seedream 5.0 hi-res', provider: 'senseaudio', caps: ['t2i', 'i2i'] },
+
+  { id: 'cogview-3-flash', label: 'cogview-3-flash', hint: 'Zhipu · free text-to-image', provider: 'zhipu', caps: ['t2i'] },
 
   // AIHubMix routes these to OpenAI's images/generations endpoint. Ids are
   // prefixed to stay unique against the openai-provider entries above; the
@@ -189,6 +203,7 @@ export const VIDEO_MODELS: MediaModel[] = [
   { id: 'sora-2-pro', label: 'sora-2-pro', hint: 'Fal · OpenAI Sora 2 Pro', provider: 'fal', caps: ['t2v'] },
 
   { id: 'minimax-video-01', label: 'video-01', hint: 'MiniMax · Hailuo', provider: 'minimax', caps: ['t2v', 'i2v'] },
+  { id: 'cogvideox-flash', label: 'cogvideox-flash', hint: 'Zhipu · free text-to-video + image-to-video', provider: 'zhipu', caps: ['t2v', 'i2v'] },
   { id: 'hyperframes-html', label: 'hyperframes-html', hint: 'HyperFrames · local HTML renderer', provider: 'hyperframes', caps: ['t2v'] },
 ];
 

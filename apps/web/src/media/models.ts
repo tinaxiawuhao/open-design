@@ -53,6 +53,7 @@ export type MediaProviderId =
   | 'aihubmix'
   | 'tavily'
   | 'leonardo'
+  | 'zhipu'
   | 'stub';
 
 export interface MediaProvider {
@@ -271,6 +272,18 @@ export const MEDIA_PROVIDERS: MediaProvider[] = [
     docsUrl: 'https://docs.senseaudio.cn',
   },
   {
+    id: 'zhipu',
+    label: 'Zhipu BigModel',
+    hint: 'CogView-3-Flash · CogVideoX-Flash',
+    integrated: true,
+    credentialsRequired: true,
+    settingsVisible: true,
+    defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    docsUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
+    supportsCustomModel: true,
+    customModelPlaceholder: 'cogview-3-flash or cogvideox-flash',
+  },
+  {
     id: 'aihubmix',
     label: 'AIHubMix',
     hint: 'OpenAI-compatible aggregator · image + speech',
@@ -415,6 +428,15 @@ export const IMAGE_MODELS: MediaModel[] = [
     hint: 'SenseAudio · ByteDance Seedream 5.0 hi-res',
     provider: 'senseaudio',
     caps: ['t2i', 'i2i'],
+  },
+
+  // Zhipu BigModel — synchronous OpenAI-compatible /images/generations.
+  {
+    id: 'cogview-3-flash',
+    label: 'cogview-3-flash',
+    hint: 'Zhipu · free text-to-image',
+    provider: 'zhipu',
+    caps: ['t2i'],
   },
 
   // AIHubMix — OpenAI-compatible /v1/images/generations. Prefixed ids stay
@@ -640,6 +662,10 @@ export const VIDEO_MODELS: MediaModel[] = [
 
   // MiniMax video.
   { id: 'minimax-video-01', label: 'video-01', hint: 'MiniMax · Hailuo', provider: 'minimax', caps: ['t2v', 'i2v'] },
+
+  // Zhipu BigModel — async /videos/generations + GET /async-result/{id} poll.
+  { id: 'cogvideox-flash', label: 'cogvideox-flash', hint: 'Zhipu · free text-to-video + image-to-video', provider: 'zhipu', caps: ['t2v', 'i2v'] },
+
   { id: 'hyperframes-html', label: 'hyperframes-html', hint: 'HyperFrames · local HTML renderer', provider: 'hyperframes', caps: ['t2v'] },
 ];
 

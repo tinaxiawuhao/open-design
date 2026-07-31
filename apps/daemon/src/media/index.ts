@@ -743,6 +743,16 @@ export async function generateMedia(args: {
       bytes = result.bytes;
       providerNote = result.providerNote;
       suggestedExt = result.suggestedExt;
+    } else if (def.provider === 'zhipu' && surface === 'image') {
+      const result = await renderZhipuImage(ctx, credentials);
+      bytes = result.bytes;
+      providerNote = result.providerNote;
+      suggestedExt = result.suggestedExt;
+    } else if (def.provider === 'zhipu' && surface === 'video') {
+      const result = await renderZhipuVideo(ctx, credentials, args.onProgress);
+      bytes = result.bytes;
+      providerNote = result.providerNote;
+      suggestedExt = result.suggestedExt;
     } else {
       // No real renderer wired up for this (provider, surface). Gate the
       // stub fallback behind OD_MEDIA_ALLOW_STUBS so release builds don't
@@ -2619,6 +2629,188 @@ function grokAspectFor(aspect?: string): string {
     return aspect;
   }
   return '16:9';
+}
+
+// ---------------------------------------------------------------------------
+// Provider: Zhipu BigModel — CogView-3-Flash (image) + CogVideoX-Flash (video).
+//
+// Image path is OpenAI-compatible: synchronous POST /images/generations that
+// returns `{ data: [{ url }] }`. Video path is asynchronous: POST
+// /videos/generations returns `{ id }`, then GET /async-result/{id} until
+// `task_status` flips to `SUCCESS` / `FAIL`. i2v carries the reference image
+// as a base64 data URI in the request body's `image` field.
+// Docs: https://open.bigmodel.cn/dev/api
+const ZHIPU_DEFAULT_BASE_URL = 'https://open.bigmodel.cn/api/paas/v4';
+
+function zhipuImageSizeFor(aspect?: string): string {
+  if (aspect === '16:9') return '1440x720';
+  if (aspect === '9:16') return '720x1440';
+  if (aspect === '4:3') return '1344x768';
+  if (aspect === '3:4') return '768x1344';
+  return '1024x1024';
+}
+
+async function renderZhipuImage(ctx: MediaContext, credentials: ProviderConfig): Promise<RenderResult> {
+  if (!credentials.apiKey) {
+    throw new Error(
+      'no Zhipu BigModel API key — configure it in Settings or set OD_ZHIPU_API_KEY / BIGMODEL_API_KEY',
+    );
+  }
+  const baseUrl = (credentials.baseUrl || ZHIPU_DEFAULT_BASE_URL).replace(/\/$/, '');
+  const wireModel = (credentials.model || ctx.wireModel).trim();
+  const url = buildOpenAIImageUrl(baseUrl, false);
+  const size = zhipuImageSizeFor(ctx.aspect);
+  const body: Record<string, unknown> = {
+    model: wireModel,
+    prompt: ctx.prompt || 'A high-quality reference image.',
+    size,
+  };
+
+  const resp = await fetch(url, withMediaRequestInit(ctx, {
+    method: 'POST',
+    headers: {
+      'authorization': `Bearer ${credentials.apiKey}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  }));
+  const data = await parseOpenAICompatibleJson(resp, 'zhipu image');
+  const bytes = await bytesFromOpenAICompatibleData(data, 'zhipu image', ctx.requestInit);
+  return {
+    bytes,
+    providerNote: `zhipu/${wireModel} · ${size} · ${bytes.length} bytes`,
+    suggestedExt: sniffImageExt(bytes),
+  };
+}
+
+async function renderZhipuVideo(
+  ctx: MediaContext,
+  credentials: ProviderConfig,
+  onProgress?: ProgressFn,
+): Promise<RenderResult> {
+  if (!credentials.apiKey) {
+    throw new Error(
+      'no Zhipu BigModel API key — configure it in Settings or set OD_ZHIPU_API_KEY / BIGMODEL_API_KEY',
+    );
+  }
+  const baseUrl = (credentials.baseUrl || ZHIPU_DEFAULT_BASE_URL).replace(/\/$/, '');
+  const wireModel = (credentials.model || ctx.wireModel).trim();
+
+  const body: Record<string, unknown> = {
+    model: wireModel,
+    prompt: ctx.prompt || 'A short cinematic clip.',
+  };
+  // CogVideoX accepts a reference image (URL or base64 data URI) in the
+  // `image` field for image-to-video. The dispatcher already turned the
+  // project-relative --image into a data URL, so hand it through verbatim.
+  if (ctx.imageRef && ctx.imageRef.dataUrl) {
+    body.image = ctx.imageRef.dataUrl;
+  }
+
+  const submitResp = await fetch(`${baseUrl}/videos/generations`, withMediaRequestInit(ctx, {
+    method: 'POST',
+    headers: {
+      'authorization': `Bearer ${credentials.apiKey}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  }));
+  const submitText = await submitResp.text();
+  if (!submitResp.ok) {
+    throw new Error(`zhipu video submit ${submitResp.status}: ${truncate(submitText, 240)}`);
+  }
+  let submitData: any;
+  try {
+    submitData = JSON.parse(submitText);
+  } catch {
+    throw new Error(`zhipu video non-JSON: ${truncate(submitText, 200)}`);
+  }
+
+  // CogVideoX returns `{ id, model, video_result? }`. A finished video may
+  // land inline on cache hits; otherwise we get an `id` to poll
+  // GET /async-result/{id} until task_status becomes SUCCESS / FAIL.
+  let videoUrl: string | null =
+    (typeof submitData?.video_result?.url === 'string' && submitData.video_result.url)
+    || null;
+  const taskId: string | null =
+    (typeof submitData?.id === 'string' && submitData.id)
+    || null;
+  let lastStatus = submitData?.task_status || '';
+
+  if (!videoUrl && taskId) {
+    const startedAt = Date.now();
+    const configuredMaxMs = Number(process.env.OD_ZHIPU_VIDEO_MAX_POLL_MS);
+    const maxMs =
+      Number.isFinite(configuredMaxMs) && configuredMaxMs >= 60_000
+        ? configuredMaxMs
+        : 8 * 60 * 1000;
+    if (typeof onProgress === 'function') {
+      const mode = ctx.imageRef ? 'i2v' : 't2v';
+      onProgress(`zhipu ${mode} task ${taskId} accepted; polling status…`);
+    }
+    while (Date.now() - startedAt < maxMs) {
+      await sleep(4000);
+      const pollResp = await fetch(
+        `${baseUrl}/async-result/${encodeURIComponent(taskId)}`,
+        withMediaRequestInit(ctx, {
+          headers: { 'authorization': `Bearer ${credentials.apiKey}` },
+        }),
+      );
+      const pollText = await pollResp.text();
+      if (!pollResp.ok) {
+        throw new Error(`zhipu poll ${pollResp.status}: ${truncate(pollText, 240)}`);
+      }
+      let pollData: any;
+      try {
+        pollData = JSON.parse(pollText);
+      } catch {
+        throw new Error(`zhipu poll non-JSON: ${truncate(pollText, 200)}`);
+      }
+      lastStatus = pollData?.task_status || '';
+      if (typeof onProgress === 'function') {
+        const elapsedSec = Math.round((Date.now() - startedAt) / 1000);
+        onProgress(`zhipu task ${taskId} status=${lastStatus || 'pending'} (elapsed ${elapsedSec}s)`);
+      }
+      if (lastStatus === 'SUCCESS') {
+        videoUrl =
+          (typeof pollData?.video_result?.url === 'string' && pollData.video_result.url)
+          || null;
+        break;
+      }
+      if (lastStatus === 'FAIL') {
+        const reasonRaw = pollData?.error || pollData?.msg || lastStatus;
+        const reason = typeof reasonRaw === 'string' ? reasonRaw : JSON.stringify(reasonRaw);
+        throw new Error(`zhipu task FAIL: ${reason}`);
+      }
+    }
+    if (!videoUrl) {
+      const elapsedSec = Math.round((Date.now() - startedAt) / 1000);
+      const ceilingSec = Math.round(maxMs / 1000);
+      throw new Error(
+        `zhipu video timed out after ${elapsedSec}s waiting for SUCCESS `
+        + `(last status: ${lastStatus || 'pending'}, ceiling ${ceilingSec}s). `
+        + `If your jobs legitimately need longer, raise OD_ZHIPU_VIDEO_MAX_POLL_MS.`,
+      );
+    }
+  }
+
+  if (!videoUrl) {
+    throw new Error(
+      `zhipu video submit returned no inline video and no task id to poll `
+      + `(status=${lastStatus || 'unknown'})`,
+    );
+  }
+
+  const dlResp = await fetch(videoUrl, withMediaRequestInit(ctx));
+  if (!dlResp.ok) throw new Error(`zhipu video fetch ${dlResp.status}`);
+  const arr = await dlResp.arrayBuffer();
+  const bytes = Buffer.from(arr);
+
+  return {
+    bytes,
+    providerNote: `zhipu/${wireModel} · ${ctx.imageRef ? 'i2v' : 't2v'} · ${bytes.length} bytes`,
+    suggestedExt: '.mp4',
+  };
 }
 
 // ---------------------------------------------------------------------------
