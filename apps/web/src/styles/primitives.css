@@ -22,7 +22,7 @@ button.primary {
   color: white;
   font-weight: 500;
   line-height: 1.2;
-  box-shadow: 0 1px 0 rgba(180, 90, 59, 0.18) inset, var(--shadow-xs);
+  box-shadow: 0 1px 0 rgba(26, 109, 255, 0.18) inset, var(--shadow-xs);
 }
 button.primary:hover:not(:disabled) {
   background: var(--accent-hover);

@@ -1698,11 +1698,11 @@ export function PreviewDrawOverlay({
               disabled={sending}
               placeholder={t('chat.annotationNotePlaceholder')}
               style={{
-                background: 'rgba(218, 97, 56, 0.18)',
-                border: '1px solid rgba(248, 150, 104, 0.82)',
+                background: 'rgba(26, 109, 255, 0.18)',
+                border: '1px solid rgba(77, 148, 255, 0.82)',
                 borderRadius: 999,
                 outline: 'none',
-                boxShadow: '0 0 0 3px rgba(218, 97, 56, 0.22)',
+                boxShadow: '0 0 0 3px rgba(26, 109, 255, 0.22)',
                 color: 'inherit',
                 flexGrow: 1,
                 flexShrink: 1,

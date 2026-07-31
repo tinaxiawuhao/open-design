@@ -585,7 +585,7 @@
   flex: 0 0 auto;
 }
 .msg-plugin-chip--design-system .msg-plugin-chip__dot {
-  background: #d76445;
+  background: var(--accent);
 }
 .msg-plugin-chip__icon {
   display: inline-flex;
@@ -2080,13 +2080,13 @@
 }
 
 .preview-draw-note-input::placeholder {
-  color: rgba(255, 225, 210, 0.86);
+  color: var(--text-faint);
 }
 
 .preview-draw-note-input:focus {
-  background: rgba(218, 97, 56, 0.26) !important;
-  border-color: rgba(255, 184, 140, 0.95) !important;
-  box-shadow: 0 0 0 3px rgba(218, 97, 56, 0.34), 0 0 18px rgba(218, 97, 56, 0.24) !important;
+  background: rgba(26, 109, 255, 0.10) !important;
+  border-color: rgba(26, 109, 255, 0.55) !important;
+  box-shadow: 0 0 0 3px rgba(26, 109, 255, 0.16), 0 0 18px rgba(26, 109, 255, 0.14) !important;
 }
 
 /* -------- Staged attachments -------------------------------------- */
