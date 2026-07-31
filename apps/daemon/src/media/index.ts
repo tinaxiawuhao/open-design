@@ -2683,6 +2683,22 @@ async function renderZhipuImage(ctx: MediaContext, credentials: ProviderConfig):
   };
 }
 
+// CogVideoX returns `video_result` as either:
+//   - an array of { url, cover_image_url } objects, or
+//   - a single { url, ... } object (older API shape).
+function extractZhipuVideoUrl(videoResult: unknown): string | null {
+  if (!videoResult || typeof videoResult !== 'object') return null;
+  if (Array.isArray(videoResult)) {
+    const first = videoResult.find(
+      (item): item is { url: string } =>
+        item != null && typeof item === 'object' && typeof (item as { url?: unknown }).url === 'string',
+    );
+    return first?.url ?? null;
+  }
+  const obj = videoResult as { url?: unknown };
+  return typeof obj.url === 'string' ? obj.url : null;
+}
+
 async function renderZhipuVideo(
   ctx: MediaContext,
   credentials: ProviderConfig,
@@ -2729,9 +2745,10 @@ async function renderZhipuVideo(
   // CogVideoX returns `{ id, model, video_result? }`. A finished video may
   // land inline on cache hits; otherwise we get an `id` to poll
   // GET /async-result/{id} until task_status becomes SUCCESS / FAIL.
-  let videoUrl: string | null =
-    (typeof submitData?.video_result?.url === 'string' && submitData.video_result.url)
-    || null;
+  // `video_result` is an array of { url, cover_image_url } on current API,
+  // but older shapes returned a single { url } object — extractZhipuVideoUrl
+  // handles both.
+  let videoUrl: string | null = extractZhipuVideoUrl(submitData?.video_result);
   const taskId: string | null =
     (typeof submitData?.id === 'string' && submitData.id)
     || null;
@@ -2772,9 +2789,7 @@ async function renderZhipuVideo(
         onProgress(`zhipu task ${taskId} status=${lastStatus || 'pending'} (elapsed ${elapsedSec}s)`);
       }
       if (lastStatus === 'SUCCESS') {
-        videoUrl =
-          (typeof pollData?.video_result?.url === 'string' && pollData.video_result.url)
-          || null;
+        videoUrl = extractZhipuVideoUrl(pollData?.video_result);
         break;
       }
       if (lastStatus === 'FAIL') {
