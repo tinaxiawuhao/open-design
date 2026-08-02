@@ -3,6 +3,7 @@
  * Discriminated union of all analytics event payloads.
  */
 import type { AnalyticsEventName } from './event-names.js';
+import type { AmrAuthStageProps } from './amr-auth.js';
 import type { DesignSystemApplyResultProps, DesignSystemCreateResultProps, DesignSystemEnrichResultProps, DesignSystemReviewResultProps, DesignSystemSourceIngestResultProps, DesignSystemStatusResultProps } from './design-systems.js';
 import type { OnboardingCompletedProps, OnboardingCompleteResultProps, OnboardingFirstGenerationCompletedProps, OnboardingFirstPromptSentProps, OnboardingPromptPrefilledProps, OnboardingRuntimeScanResultProps } from './onboarding.js';
 import type { PageViewProps } from './page-view.js';
@@ -67,6 +68,7 @@ export type AnalyticsEventPayload =
     }
   | { event: 'byok_preflight_blocked'; props: ByokPreflightBlockedProps }
   | { event: 'settings_connector_auth_result'; props: SettingsConnectorAuthResultProps }
+  | { event: 'amr_auth_stage'; props: AmrAuthStageProps }
   | { event: 'amr_auth_result'; props: AmrAuthResultProps }
   | { event: 'onboarding_runtime_scan_result'; props: OnboardingRuntimeScanResultProps }
   | { event: 'onboarding_complete_result'; props: OnboardingCompleteResultProps }

@@ -21,6 +21,22 @@ function countOccurrences(content: string, needle: string): number {
 }
 
 describe("release workflows", () => {
+  it("retains only the newest outer tools-pack cache for each release lane", async () => {
+    const workflows = await Promise.all([
+      readFile(new URL("../../../.github/workflows/release-beta.yml", import.meta.url), "utf8"),
+      readFile(new URL("../../../.github/workflows/release-preview.yml", import.meta.url), "utf8"),
+      readFile(new URL("../../../.github/workflows/release-prerelease.yml", import.meta.url), "utf8"),
+      readFile(new URL("../../../.github/workflows/release-stable.yml", import.meta.url), "utf8"),
+    ]);
+
+    expect(workflows.map((workflow) => countOccurrences(workflow, "keep=1"))).toEqual([2, 2, 2, 0]);
+    expect(workflows.map((workflow) => countOccurrences(workflow, "$keep = 1"))).toEqual([1, 1, 1, 1]);
+    for (const workflow of workflows) {
+      expect(workflow).not.toContain("keep=3");
+      expect(workflow).not.toContain("$keep = 3");
+    }
+  });
+
   it("requires Vela CLI for every beta desktop packaging target", async () => {
     const [beta, betaSelfHosted, preview, prerelease, stable, stablePrepare, buildMac, buildWin, prepareMac, prepareWin, publishPlatform, winLifecycle, desktopUpdater, macBuild, macFs, installUnsafeDmg, winApp, macWorkspace, linuxPack] = await Promise.all([
       readFile(new URL("../../../.github/workflows/release-beta.yml", import.meta.url), "utf8"),

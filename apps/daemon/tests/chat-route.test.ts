@@ -3151,8 +3151,15 @@ process.stdin.on('end', () => {
           const transcriptIdx = prompt.indexOf('## Full conversation transcript');
           expect(transitionIdx).toBeGreaterThan(-1);
           expect(transcriptIdx).toBeGreaterThan(transitionIdx);
-          expect(prompt).toContain('The user has answered the discovery form. Do not emit another discovery form.');
-          expect(prompt).toContain('Continue with RULE 2 / RULE 3 now.');
+          expect(prompt).toContain(
+            'The user has answered the discovery form. Do not re-emit the answered form or repeat fields it already answered.',
+          );
+          expect(prompt).toContain(
+            'Apply the submitted answers and continue with RULE 2 / RULE 3 or the matching active workflow.',
+          );
+          expect(prompt).toContain(
+            'Only if a new, materially blocking requirement remains unresolved',
+          );
           expect(prompt).toContain(formAnswers);
         },
       );
@@ -3689,6 +3696,13 @@ describe('chat prompt helpers', () => {
       projectDesignSystemId: 'project-ds',
       appDefaultDesignSystemId: 'default-ds',
     })).toEqual({ id: 'project-ds', source: 'project' });
+
+    expect(resolveEffectiveDesignSystemSelection({
+      requestDesignSystemId: null,
+      projectDesignSystemId: 'project-ds',
+      disabledDesignSystemIds: ['project-ds'],
+      allowAppDefault: false,
+    })).toEqual({ id: null, source: 'none' });
 
     expect(resolveEffectiveDesignSystemSelection({
       appDefaultDesignSystemId: 'default-ds',

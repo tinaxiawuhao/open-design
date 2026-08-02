@@ -302,10 +302,16 @@ export interface BrowserUseRunState {
   diagnostics: BrowserUseDiscoveryFacts;
 }
 
+/**
+ * Web chat POST /api/runs body. `conversationId` is required (web always has a
+ * chat home). `assistantMessageId` is optional: when omitted the daemon mints
+ * one so multi-turn native session resume still gets a pin cursor.
+ */
 export interface ChatRunCreateRequest extends ChatRequest {
   projectId: string;
   conversationId: string;
-  assistantMessageId: string;
+  /** Client pin id; daemon mints when omitted (API / omit-pin clients). */
+  assistantMessageId?: string;
   clientRequestId: string;
 }
 
@@ -314,9 +320,17 @@ export interface ChatRunCreateRequest extends ChatRequest {
  * manage conversation state client-side. Only `projectId` is required;
  * `message` and `agentId` are optional — the daemon resolves `agentId` from
  * the saved app-config when it is omitted.
+ *
+ * Callers may optionally bind `conversationId` (and omit `assistantMessageId`);
+ * the daemon mints the pin and seeds the user message when the conversation
+ * is bound and owned by `projectId`.
  */
 export interface McpRunCreateRequest {
   projectId: string;
+  /** Optional bound conversation; when set without assistantMessageId the daemon mints a pin. */
+  conversationId?: string;
+  /** Optional client pin; omit to let the daemon mint when a conversation is bound. */
+  assistantMessageId?: string;
   /** Stable id generated once per confirmed user action and reused on transport retry. */
   clientRequestId?: string;
   message?: string;

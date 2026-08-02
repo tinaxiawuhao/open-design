@@ -59,6 +59,7 @@ export type AnalyticsEventName =
   | 'byok_preflight_blocked'
   | 'settings_connector_auth_result'
   // AMR (hosted model) account auth result.
+  | 'amr_auth_stage'
   | 'amr_auth_result'
   // Onboarding-only result events. UI clicks + page_views inside the
   // onboarding flow reuse the generic `ui_click` / `page_view` shapes

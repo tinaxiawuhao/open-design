@@ -72,10 +72,11 @@ Re-deriving an upstream node's own inputs is not a substitute: upstream keys
 carry inputs that are not file content (see R3), so re-derivation silently
 drops them.
 
-Existing links: `win.packaged-app` carries `tarballsKey`;
-`win.electron-builder-dir` carries `packagedAppKey` and `resourceTreeKey`;
-`win.nsis-installer` carries `basePayloadKey` and `overlayPayloadKey`;
-`win.launcher-payload` carries `sourceKey`.
+Existing links: `win.workspace-tarballs` carries `workspaceBuildKey`;
+`win.packaged-app` carries `tarballsKey`; `win.electron-builder-dir` carries
+`packagedAppKey` and `resourceTreeKey`; `win.nsis-installer` carries
+`basePayloadKey` and `overlayPayloadKey`; `win.launcher-payload` carries
+`sourceKey`.
 
 **R3 — Build outputs are never direct key inputs.** `hashPackageSourcePath`
 excludes `dist`, `.next`, `out`, `node_modules`, and `.od`. A node that

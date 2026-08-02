@@ -160,13 +160,16 @@ async function buildWorkspaceArtifacts(config: ToolPackConfig): Promise<void> {
   await runPnpm(config, ["--filter", "@open-design/packaged", "build"]);
 }
 
-export async function ensureWinWorkspaceBuild(config: ToolPackConfig, cache: ToolPackCache): Promise<void> {
-  await ensureWorkspaceBuildArtifacts(config, cache, async () => {
+export async function ensureWinWorkspaceBuild(config: ToolPackConfig, cache: ToolPackCache): Promise<string> {
+  return ensureWorkspaceBuildArtifacts(config, cache, async () => {
     await buildWorkspaceArtifacts(config);
   });
 }
 
-export async function createWorkspaceTarballsCacheKey(config: ToolPackConfig): Promise<string> {
+export async function createWorkspaceTarballsCacheKey(
+  config: ToolPackConfig,
+  workspaceBuildKey: string,
+): Promise<string> {
   const packageHashes: Record<string, string> = {};
   for (const packageInfo of INTERNAL_PACKAGES) {
     packageHashes[packageInfo.name] = await hashPackageSourcePath(join(config.workspaceRoot, packageInfo.directory));
@@ -181,8 +184,9 @@ export async function createWorkspaceTarballsCacheKey(config: ToolPackConfig): P
     packageManager: rootPackageJson.packageManager,
     pnpmLock: await hashPath(join(config.workspaceRoot, "pnpm-lock.yaml")),
     prebundle: shouldUseWinStandalonePrebundle(config.webOutputMode),
-    schemaVersion: 6,
+    schemaVersion: 7,
     webOutputMode: config.webOutputMode,
+    workspaceBuildKey,
   });
 }
 
@@ -190,8 +194,9 @@ export async function collectWorkspaceTarballs(
   config: ToolPackConfig,
   paths: WinPaths,
   cache: ToolPackCache,
+  workspaceBuildKey: string,
 ): Promise<PackedTarballsCacheResult> {
-  const key = await createWorkspaceTarballsCacheKey(config);
+  const key = await createWorkspaceTarballsCacheKey(config, workspaceBuildKey);
   const node = {
     id: "win.workspace-tarballs",
     key,

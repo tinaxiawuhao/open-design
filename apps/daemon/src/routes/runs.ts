@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from 'express';
 import type Database from 'better-sqlite3';
 import fs from 'node:fs';
+import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   defaultScenarioPluginIdForProjectMetadata,
@@ -111,6 +112,21 @@ import {
   runDesignSystemCreatedForRun,
   runPreviewModuleCountForRun,
 } from '../runtimes/run-lifecycle-analytics.js';
+import { normalizeCommentAttachments } from '../runtimes/chat-prompt-inputs.js';
+
+// Keep in sync with the web uploader's `looksLikeImage` (apps/web registry):
+// omit-pin seeds must classify the same extensions as `image` so reload chips
+// match the original staged attachment kind.
+const SEEDED_USER_IMAGE_EXTS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.avif',
+  '.svg',
+  '.bmp',
+]);
 
 type SqliteDb = Database.Database;
 type JsonRecord = Record<string, unknown>;
@@ -119,6 +135,107 @@ type ApiResponse = Response<unknown>;
 type ProjectMetadata = (Partial<ContractProjectMetadata> & JsonRecord) | null | undefined;
 type AgentCliEnv = Parameters<typeof agentCliEnvForAgent>[0];
 type RunDeliveryTarget = 'managed-project' | 'external-project' | 'none';
+type SeededCommentAttachment = ReturnType<typeof normalizeCommentAttachments>[number] & {
+  slideIndex?: number;
+};
+
+/**
+ * Deck annotations carry a zero-based `slideIndex` so reload/retry can flip the
+ * preview via `queuedSlideNavTarget`. The prompt normalizer intentionally omits
+ * it; re-attach from the raw request when seeding persisted messages.
+ */
+function seededSlideIndexFromRaw(raw: unknown): number | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const slideIndex = (raw as { slideIndex?: unknown }).slideIndex;
+  if (typeof slideIndex !== 'number' || !Number.isFinite(slideIndex) || slideIndex < 0) {
+    return undefined;
+  }
+  return Math.floor(slideIndex);
+}
+
+function withSeededSlideIndex(
+  normalized: ReturnType<typeof normalizeCommentAttachments>,
+  rawCommentAttachments: unknown[],
+): SeededCommentAttachment[] {
+  return normalized.map((item, index) => {
+    const rawById = rawCommentAttachments.find(
+      (entry) =>
+        entry &&
+        typeof entry === 'object' &&
+        !Array.isArray(entry) &&
+        typeof (entry as { id?: unknown }).id === 'string' &&
+        (entry as { id: string }).id === item.id,
+    );
+    const slideIndex = seededSlideIndexFromRaw(rawById ?? rawCommentAttachments[index]);
+    return slideIndex === undefined ? item : { ...item, slideIndex };
+  });
+}
+
+/**
+ * Map ChatRunCreateRequest attachment fields onto the ChatMessage shape used by
+ * upsertMessage / listMessages. Request `attachments` are project-relative
+ * path strings; persisted messages store `{ path, name, kind, order }` so the
+ * UI can reload chips and annotation context after a headless omit-pin seed.
+ */
+function seededUserMessageAttachmentFields(meta: JsonRecord): {
+  attachments?: Array<{ path: string; name: string; kind: 'image' | 'file'; order: number }>;
+  commentAttachments?: SeededCommentAttachment[];
+} {
+  const attachments = Array.isArray(meta.attachments)
+    ? meta.attachments
+        .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+        .map((attachmentPath, index) => {
+          const name = path.basename(attachmentPath) || attachmentPath;
+          const ext = path.extname(name).toLowerCase();
+          return {
+            path: attachmentPath,
+            name,
+            kind: SEEDED_USER_IMAGE_EXTS.has(ext) ? ('image' as const) : ('file' as const),
+            order: index,
+          };
+        })
+    : [];
+  const rawCommentAttachments = Array.isArray(meta.commentAttachments)
+    ? meta.commentAttachments
+    : [];
+  const commentAttachments = withSeededSlideIndex(
+    normalizeCommentAttachments(
+      rawCommentAttachments as Parameters<typeof normalizeCommentAttachments>[0],
+    ),
+    rawCommentAttachments,
+  );
+  return {
+    ...(attachments.length > 0 ? { attachments } : {}),
+    ...(commentAttachments.length > 0 ? { commentAttachments } : {}),
+  };
+}
+
+/**
+ * Map request/run turn metadata onto the ChatMessage fields the web client
+ * writes via PUT /messages. ChatPane and ProjectView retry both re-read
+ * sessionMode / runContext / appliedPluginSnapshot from the user message after
+ * reload, so omit-pin seeds must persist the same columns.
+ */
+function seededUserMessageTurnMetadataFields(
+  meta: JsonRecord,
+  appliedPluginSnapshot?: AppliedPluginSnapshot | null,
+): {
+  sessionMode?: string;
+  runContext?: Record<string, unknown>;
+  appliedPluginSnapshot?: AppliedPluginSnapshot;
+} {
+  const runContext =
+    meta.context && typeof meta.context === 'object' && !Array.isArray(meta.context)
+      ? (meta.context as Record<string, unknown>)
+      : undefined;
+  return {
+    ...(typeof meta.sessionMode === 'string' && meta.sessionMode
+      ? { sessionMode: meta.sessionMode }
+      : {}),
+    ...(runContext ? { runContext } : {}),
+    ...(appliedPluginSnapshot ? { appliedPluginSnapshot } : {}),
+  };
+}
 
 interface ProjectRecord {
   id: string;
@@ -516,12 +633,14 @@ function resolveEffectiveDesignSystemSelection({
   pluginDesignSystemId,
   projectDesignSystemId,
   appDefaultDesignSystemId,
+  disabledDesignSystemIds,
   allowAppDefault = true,
 }: {
   requestDesignSystemId?: unknown;
   pluginDesignSystemId?: unknown;
   projectDesignSystemId?: unknown;
   appDefaultDesignSystemId?: unknown;
+  disabledDesignSystemIds?: unknown;
   allowAppDefault?: boolean;
 }): { id: string | null; source: DesignSystemSelectionSource } {
   const requestId = normalizedDesignSystemId(requestDesignSystemId);
@@ -530,8 +649,15 @@ function resolveEffectiveDesignSystemSelection({
   const pluginId = normalizedDesignSystemId(pluginDesignSystemId);
   if (pluginId) return { id: pluginId, source: 'plugin' };
 
+  const disabledIds = Array.isArray(disabledDesignSystemIds)
+    ? disabledDesignSystemIds.map(normalizedDesignSystemId).filter(
+        (value): value is string => value !== null,
+      )
+    : [];
   const projectId = normalizedDesignSystemId(projectDesignSystemId);
-  if (projectId) return { id: projectId, source: 'project' };
+  if (projectId && !disabledIds.includes(projectId)) {
+    return { id: projectId, source: 'project' };
+  }
 
   if (allowAppDefault) {
     const appDefaultId = normalizedDesignSystemId(appDefaultDesignSystemId);
@@ -768,6 +894,22 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
         initialByokInputError,
       );
     }
+    // Reject a client-supplied conversationId that is missing a projectId or
+    // not owned by that projectId before plugin snapshot resolve (which links
+    // the snapshot to the conversation and would FK-fail / 500) and before
+    // omit-pin mint/seed (which would return 202 with an unpersisted
+    // assistantMessageId, or write messages without owning-project context).
+    if (typeof requestBody.conversationId === 'string' && requestBody.conversationId) {
+      const requestConversation = getConversation(db, requestBody.conversationId);
+      if (
+        !requestConversation ||
+        typeof requestBody.projectId !== 'string' ||
+        !requestBody.projectId ||
+        requestConversation.projectId !== requestBody.projectId
+      ) {
+        return sendApiError(res, 404, 'CONVERSATION_NOT_FOUND', 'conversation not found for project');
+      }
+    }
     let resolvedSnapshot = null;
     if (typeof requestBody.projectId === 'string' && requestBody.projectId) {
       let registryView: Parameters<typeof resolvePluginSnapshot>[0]['registry'];
@@ -953,10 +1095,9 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
         );
       }
     }
-    let fallbackUserMessage: {
-      conversationId: string;
-      content: string;
-    } | null = null;
+    // Headless / MCP clients often omit conversationId; bind the project's
+    // earliest conversation so the run has a chat home.
+    let conversationFallbackBound = false;
     if (
       typeof meta.projectId === 'string' &&
       meta.projectId &&
@@ -976,19 +1117,7 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
           : null;
         if (defaultConv && typeof defaultConv.id === 'string' && defaultConv.id) {
           meta.conversationId = defaultConv.id;
-          if (typeof meta.assistantMessageId !== 'string' || !meta.assistantMessageId) {
-            meta.assistantMessageId = randomUUID();
-          }
-          const promptForUserMessage =
-            typeof meta.message === 'string' && meta.message.trim().length > 0
-              ? meta.message
-              : null;
-          if (promptForUserMessage) {
-            fallbackUserMessage = {
-              conversationId: defaultConv.id,
-              content: promptForUserMessage,
-            };
-          }
+          conversationFallbackBound = true;
         }
       } catch (err) {
         console.warn('[runs] mcp conversation fallback failed', err);
@@ -998,23 +1127,92 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
       typeof meta.conversationId === 'string' && meta.conversationId
         ? getConversation(db, meta.conversationId)
         : null;
-    // A run may only attach to a conversation owned by its own project. Without
-    // this guard a request pairing projectId=A with a conversationId owned by
-    // project B runs in A's cwd but pins its messages and native session under
-    // B — corrupting B's chat history and resume identity. Mirror the ownership
-    // check the sibling routes already enforce (handoff.ts, terminal.ts).
-    if (
-      conversationSession &&
-      typeof meta.projectId === 'string' &&
-      meta.projectId &&
-      conversationSession.projectId !== meta.projectId
-    ) {
-      return sendApiError(res, 404, 'CONVERSATION_NOT_FOUND', 'conversation not found for project');
+    // Re-check after optional headless conversation bind: a run may only attach
+    // to a conversation that exists and is owned by its project. Covers both
+    // client-supplied ids (already validated above) and fallback-bound ids.
+    // Require a string projectId so omit-pin never seeds without owning-project
+    // context. Must run before omit-pin mint/seed so a missing conversation
+    // never yields a 202 with an assistantMessageId that was never persisted.
+    if (typeof meta.conversationId === 'string' && meta.conversationId) {
+      if (
+        !conversationSession ||
+        typeof meta.projectId !== 'string' ||
+        !meta.projectId ||
+        conversationSession.projectId !== meta.projectId
+      ) {
+        return sendApiError(res, 404, 'CONVERSATION_NOT_FOUND', 'conversation not found for project');
+      }
     }
+    // Resolve session mode before omit-pin seed so the user turn stores the
+    // same mode the run will use (matches web PUT /messages persistence).
     meta.sessionMode =
       meta.sessionMode === 'chat' || meta.sessionMode === 'design' || meta.sessionMode === 'plan'
         ? normalizeConversationSessionMode(meta.sessionMode)
         : normalizeConversationSessionMode(conversationSession?.sessionMode);
+    // Web always mints assistantMessageId client-side. API clients that already
+    // know conversationId (eval runners, scripts, MCP after the bind above) may
+    // omit it. Without a server-side pin, pinAssistantMessageOnRunCreate no-ops,
+    // lastMessageId stays null, and multi-turn native session resume is skipped
+    // (missing_cursor / resume_skipped). Ownership is validated above first.
+    // Also seed the user turn when the server bound conversationId via the
+    // headless fallback even if the client already supplied a pin — the pre-
+    // refactor path always seeded in that case, and MCP allows pin + omitted
+    // conversationId independently.
+    //
+    // Prepare seed payload before createOrReuse, but only persist when the run
+    // is newly created so lost-response retries with clientRequestId do not
+    // duplicate user turns.
+    const missingClientPin =
+      typeof meta.assistantMessageId !== 'string' || !meta.assistantMessageId;
+    let omitPinUserSeed: {
+      conversationId: string;
+      content: string;
+      attachments: ReturnType<typeof seededUserMessageAttachmentFields>;
+      turnMetadata: ReturnType<typeof seededUserMessageTurnMetadataFields>;
+    } | null = null;
+    if (
+      typeof meta.conversationId === 'string' &&
+      meta.conversationId &&
+      (missingClientPin || conversationFallbackBound)
+    ) {
+      if (missingClientPin) {
+        meta.assistantMessageId = randomUUID();
+      }
+      // Prefer original request currentPrompt (latest turn) whenever it is a
+      // string — including empty for attachments-only sends. Plugin resolution
+      // may replace meta.message with a rendered scenario brief for the run
+      // (see above); seed visible chat content from requestBody so that
+      // internal brief never appears as user-authored content. message may be
+      // a full flattened ChatRequest transcript. Minimal MCP requests set both
+      // equal. Only fall back to message when currentPrompt is absent. Empty
+      // message is still seedable when attachment metadata is present so
+      // chips/annotations survive reload for omit-pin clients that leave
+      // currentPrompt unset.
+      const seededAttachments = seededUserMessageAttachmentFields(meta);
+      const hasSeedableAttachmentMetadata =
+        (seededAttachments.attachments?.length ?? 0) > 0 ||
+        (seededAttachments.commentAttachments?.length ?? 0) > 0;
+      const originalCurrentPrompt = requestBody.currentPrompt;
+      const originalMessage = requestBody.message;
+      const promptForUserMessage =
+        typeof originalCurrentPrompt === 'string'
+          ? originalCurrentPrompt
+          : typeof originalMessage === 'string' &&
+              (originalMessage.trim().length > 0 || hasSeedableAttachmentMetadata)
+            ? originalMessage
+            : null;
+      if (promptForUserMessage !== null) {
+        omitPinUserSeed = {
+          conversationId: meta.conversationId,
+          content: promptForUserMessage,
+          attachments: seededAttachments,
+          turnMetadata: seededUserMessageTurnMetadataFields(
+            meta,
+            resolvedSnapshot?.ok ? resolvedSnapshot.snapshot : null,
+          ),
+        };
+      }
+    }
     meta.requestFingerprint = runRequestFingerprint(
       meta,
       resolvedSnapshot?.ok ? resolvedSnapshot.snapshot : null,
@@ -1072,14 +1270,32 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
       }
       resumed = true;
     }
-    if (creation.kind === 'created' && fallbackUserMessage) {
-      upsertMessage(db, fallbackUserMessage.conversationId, {
-        id: randomUUID(),
-        role: 'user',
-        content: fallbackUserMessage.content,
-        startedAt: Date.now(),
-        endedAt: Date.now(),
-      });
+    if (creation.kind === 'created' && omitPinUserSeed) {
+      try {
+        const now = Date.now();
+        upsertMessage(db, omitPinUserSeed.conversationId, {
+          id: randomUUID(),
+          role: 'user',
+          content: omitPinUserSeed.content,
+          startedAt: now,
+          endedAt: now,
+          // Same turn metadata the web client writes via PUT /messages so
+          // reload/retry keep sessionMode, runContext, and applied plugin.
+          ...omitPinUserSeed.turnMetadata,
+          // Preserve request attachments/commentAttachments on the seeded user
+          // turn so reload/listMessages still show chips and annotation context
+          // for omit-pin / headless clients (same columns as PUT /messages).
+          ...omitPinUserSeed.attachments,
+        });
+        // Bump parent project updatedAt so listProjects reorders (same as
+        // PUT /messages). Headless/API turns that never hit that route would
+        // otherwise leave the project buried under more recent activity.
+        if (typeof meta.projectId === 'string' && meta.projectId) {
+          updateProject(db, meta.projectId, {});
+        }
+      } catch (err) {
+        console.warn('[runs] api client user message pin failed', err);
+      }
     }
     try {
       pinAssistantMessageOnRunCreate(db, run);
@@ -1273,6 +1489,7 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
           : null,
         projectDesignSystemId: runProjectForAnalytics?.designSystemId,
         appDefaultDesignSystemId: (appCfgForAnalytics as { designSystemId?: unknown }).designSystemId,
+        disabledDesignSystemIds: (appCfgForAnalytics as { disabledDesignSystems?: unknown }).disabledDesignSystems,
         allowAppDefault: runProjectForAnalytics === null,
       });
       const runProjectKind = resolveRunProjectKindForAnalytics({
