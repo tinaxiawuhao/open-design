@@ -52,6 +52,8 @@ const PACKAGED_CHILD_ENV_ALLOWLIST = [
   "ALL_PROXY",
   "NODE_USE_ENV_PROXY",
   "NO_PROXY",
+  "OD_BIND_HOST",
+  "OD_HOST",
   "TMPDIR",
   "USER",
   "VP_HOME",
@@ -413,6 +415,7 @@ export type PackagedDaemonSpawnEnvOptions = {
   appVersion: string | null;
   amrProfile?: string | null;
   daemonCliEntry: string | null;
+  daemonPort?: string | null;
   desktopHandoffEnv?: NodeJS.ProcessEnv;
   mcpBootstrapArgs?: readonly string[];
   mcpBootstrapCommand?: string | null;
@@ -444,7 +447,8 @@ export function buildPackagedDaemonSpawnEnv(
   options: PackagedDaemonSpawnEnvOptions,
 ): NodeJS.ProcessEnv {
   return {
-    [SIDECAR_ENV.DAEMON_PORT]: "0",
+    [SIDECAR_ENV.DAEMON_PORT]: options.daemonPort ?? "0",
+    ...(process.env.OD_BIND_HOST == null ? {} : { OD_BIND_HOST: process.env.OD_BIND_HOST }),
     ...(options.daemonCliEntry == null ? {} : { [SIDECAR_ENV.DAEMON_CLI_PATH]: options.daemonCliEntry }),
     // PR #974 round-4 P1 + round-5 P2: pinned ON when a desktop is
     // being started, OFF for headless. The daemon-side flag refuses
@@ -708,6 +712,7 @@ export async function startPackagedSidecars(
         appVersion: options.appVersion,
         amrProfile: options.amrProfile,
         daemonCliEntry: options.daemonCliEntry,
+        daemonPort: process.env.OD_PORT ?? null,
         desktopHandoffEnv: process.env,
         legacyDataDir: process.env.OD_LEGACY_DATA_DIR ?? null,
         mcpBootstrapArgs: options.mcpBootstrapArgs,
@@ -759,10 +764,11 @@ export async function startPackagedSidecars(
       entryPath: webSidecarEntry,
       env: {
         [SIDECAR_ENV.DAEMON_PORT]: extractPort(daemonStatus.url),
-        [SIDECAR_ENV.WEB_PORT]: "0",
+        [SIDECAR_ENV.WEB_PORT]: process.env.OD_WEB_PORT ?? "0",
+        ...(process.env.OD_HOST == null ? {} : { OD_HOST: process.env.OD_HOST }),
         ...(options.webStandaloneRoot == null ? {} : { OD_WEB_STANDALONE_ROOT: options.webStandaloneRoot }),
         OD_WEB_OUTPUT_MODE: options.webOutputMode,
-        PORT: "0",
+        PORT: process.env.OD_WEB_PORT ?? "0",
       },
       electronNodeCommand: options.electronNodeCommand,
       nodeCommand: options.nodeCommand,
