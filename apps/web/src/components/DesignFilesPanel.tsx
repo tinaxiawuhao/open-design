@@ -170,7 +170,7 @@ function ActionNoticeView({ notice }: { notice: ActionNotice | null }) {
 // a loose journey: file basics → feeding context → generating → iterating →
 // exporting/sharing → community. A tip with a `url` renders its typed line as
 // a link to that destination.
-const USEFUL_TIPS: ReadonlyArray<{ key: keyof Dict; url?: string }> = [
+const USEFUL_TIPS: ReadonlyArray<{ key: keyof Dict }> = [
   { key: 'designFiles.usefulInfoTip' },
   { key: 'designFiles.usefulInfoTip2' },
   { key: 'designFiles.usefulInfoTip9' },
@@ -182,17 +182,14 @@ const USEFUL_TIPS: ReadonlyArray<{ key: keyof Dict; url?: string }> = [
   { key: 'designFiles.usefulInfoTip14' },
   { key: 'designFiles.usefulInfoTip15' },
   { key: 'designFiles.usefulInfoTip5' },
-  { key: 'designFiles.usefulInfoTip6', url: 'https://discord.gg/mHAjSMV6gz' },
-  { key: 'designFiles.usefulInfoTip7', url: 'https://github.com/nexu-io/open-design' },
-  { key: 'designFiles.usefulInfoTip8', url: 'https://x.com/OpenDesignHQ' },
-  { key: 'designFiles.usefulInfoTip16', url: 'https://www.threads.com/@opendesign.ai' },
-  { key: 'designFiles.usefulInfoTip17', url: 'https://www.instagram.com/opendesign.ai/' },
-  { key: 'designFiles.usefulInfoTip18', url: 'https://www.youtube.com/@Open-Design-ai' },
-  { key: 'designFiles.usefulInfoTip19', url: 'https://www.linkedin.com/company/open-design-ai/' },
-  {
-    key: 'designFiles.usefulInfoTip20',
-    url: 'https://www.xiaohongshu.com/user/profile/691effad000000003002978f',
-  },
+  { key: 'designFiles.usefulInfoTip6' },
+  { key: 'designFiles.usefulInfoTip7' },
+  { key: 'designFiles.usefulInfoTip8' },
+  { key: 'designFiles.usefulInfoTip16' },
+  { key: 'designFiles.usefulInfoTip17' },
+  { key: 'designFiles.usefulInfoTip18' },
+  { key: 'designFiles.usefulInfoTip19' },
+  { key: 'designFiles.usefulInfoTip20' },
 ];
 const TIP_TYPE_MS = 32; // per-character typing speed
 const TIP_HOLD_MS = 3800; // pause on a fully-typed tip before advancing
@@ -265,13 +262,7 @@ function RotatingTip({ auxiliary = false }: { auxiliary?: boolean }) {
         <span className="df-useful-info-label">{t('designFiles.usefulInfoLabel')}</span>
       </div>
       <span className="df-useful-info-tip">
-        {USEFUL_TIPS[index]?.url ? (
-          <a className="df-tip-link" href={USEFUL_TIPS[index].url} target="_blank" rel="noreferrer">
-            {typed}
-          </a>
-        ) : (
-          typed
-        )}
+        {typed}
         <span className="df-tip-caret" aria-hidden />
       </span>
     </div>

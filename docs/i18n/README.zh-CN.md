@@ -355,6 +355,7 @@ Node `~24`，pnpm `10.33.x`。Windows 用户请参见 [`docs/windows-troubleshoo
 构建可移植的 AppImage，可拷贝到任意 Linux 机器直接运行：
 
 ```bash
+pnpm --filter @open-design/tools-pack build
 # 构建可移植 AppImage（跨发行版兼容）
 pnpm tools-pack linux build --to all --portable --containerized
 
@@ -377,8 +378,7 @@ pnpm tools-pack linux install --headless
 pnpm tools-pack linux start --headless
 
 # 绑定所有网络接口 + 固定端口
-OD_HOST=0.0.0.0 OD_PORT=17456 OD_WEB_PORT=17573 \
-  pnpm tools-pack linux start --headless
+OD_HOST=0.0.0.0 OD_PORT=17456 OD_WEB_PORT=17573 pnpm tools-pack linux start --headless
 
 # 查看状态与日志
 pnpm tools-pack linux inspect --headless     # 查看状态

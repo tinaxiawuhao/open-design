@@ -114,7 +114,7 @@ export type QuestionFormSubmitHandler = (
   context?: RunContextSelection,
 ) => boolean | void | Promise<boolean | void>;
 
-const DISCORD_INVITE_URL = "https://discord.gg/mHAjSMV6gz";
+const DISCORD_INVITE_URL = "";
 const viewedInlineQuestionForms = new Set<string>();
 const QUESTION_FORM_DRAFT_STORAGE_PREFIX = "open-design:question-form-draft:";
 

@@ -31,7 +31,6 @@ export type EntrySettingsSection =
   | 'pet'
   | 'projectLocations'
   | 'library'
-  | 'about'
   | 'memory'
   | 'designSystems';
 

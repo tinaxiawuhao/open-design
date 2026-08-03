@@ -28,7 +28,6 @@ import type {
 import type {
   AgentInfo,
   AppVersionInfo,
-  AppVersionResponse,
   WhatsNewResponse,
   ChatAttachment,
   CodexPetSummary,
@@ -945,7 +944,7 @@ export async function openExternalUrl(url: string): Promise<boolean> {
 async function bridgeFirstPartyUrl(url: string): Promise<string | null> {
   try {
     const target = new URL(url);
-    if (!['open-design.ai', 'www.open-design.ai', 'staging.open-design.ai'].includes(target.hostname)) return null;
+    if (!['example.com'].includes(target.hostname)) return null;
     const resp = await fetch('/api/attribution/bridge-url', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1212,27 +1211,8 @@ export async function cancelConnectorAuthorization(connectorId: string): Promise
   }
 }
 
-function isAppVersionInfo(value: unknown): value is AppVersionInfo {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as Partial<AppVersionInfo>;
-  return (
-    typeof candidate.version === 'string' &&
-    typeof candidate.channel === 'string' &&
-    typeof candidate.packaged === 'boolean' &&
-    typeof candidate.platform === 'string' &&
-    typeof candidate.arch === 'string'
-  );
-}
-
 export async function fetchAppVersionInfo(): Promise<AppVersionInfo | null> {
-  try {
-    const resp = await fetch('/api/version');
-    if (!resp.ok) return null;
-    const json = (await resp.json()) as Partial<AppVersionResponse>;
-    return isAppVersionInfo(json.version) ? json.version : null;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 export type LatestGithubReleaseInfo = {
@@ -1242,37 +1222,11 @@ export type LatestGithubReleaseInfo = {
 };
 
 export async function fetchLatestGithubReleaseInfo(): Promise<LatestGithubReleaseInfo | null> {
-  try {
-    const resp = await fetch('/api/github/open-design/releases/latest');
-    if (!resp.ok) return null;
-    const json = (await resp.json()) as Partial<OpenDesignGithubLatestReleaseResponse>;
-    if (typeof json.tag_name !== 'string' || typeof json.html_url !== 'string') return null;
-    return {
-      tagName: json.tag_name,
-      htmlUrl: json.html_url,
-      stale: json.stale === true,
-    };
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 export async function fetchWhatsNew(): Promise<WhatsNewResponse | null> {
-  try {
-    const resp = await fetch('/api/whats-new');
-    if (!resp.ok) return null;
-    const json = (await resp.json()) as Partial<WhatsNewResponse>;
-    if (typeof json.version !== 'string') {
-      return null;
-    }
-    return {
-      version: json.version,
-      id: typeof json.id === 'string' ? json.id : null,
-      content: json.content ?? null,
-    };
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 export type SkillExampleResult =

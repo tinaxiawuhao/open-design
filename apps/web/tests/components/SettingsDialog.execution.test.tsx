@@ -278,10 +278,8 @@ function renderSettingsDialog(
     daemonLive?: boolean;
     onRefreshAgents?: OnRefreshAgents;
     initialSection?: SettingsSection;
-    appVersionInfo?: AppVersionInfo | null;
     providerModelsCache?: Record<string, ProviderModelOption[]>;
     welcome?: boolean;
-    onSilentUpdatePreferenceChange?: (allowSilentUpdates: boolean) => Promise<void>;
   } = {},
 ) {
   const onPersist = vi.fn();
@@ -299,9 +297,6 @@ function renderSettingsDialog(
     createdAt: 1,
     updatedAt: 1,
   }));
-  const onSilentUpdatePreferenceChange: (allowSilentUpdates: boolean) => Promise<void> =
-    options.onSilentUpdatePreferenceChange
-    ?? (async () => undefined);
   const onClose = vi.fn();
   const onRefreshAgents = options.onRefreshAgents ?? vi.fn<OnRefreshAgents>();
 
@@ -310,12 +305,10 @@ function renderSettingsDialog(
       initial={{ ...baseConfig, ...initial }}
       agents={options.agents ?? availableAgents}
       daemonLive={options.daemonLive ?? true}
-      appVersionInfo={options.appVersionInfo ?? null}
       initialSection={options.initialSection ?? 'execution'}
       providerModelsCache={options.providerModelsCache}
       welcome={options.welcome}
       onPersist={onPersist}
-      onSilentUpdatePreferenceChange={onSilentUpdatePreferenceChange}
       onPersistComposioKey={onPersistComposioKey}
       onPersistByokCredential={onPersistByokCredential}
       onClose={onClose}
@@ -325,7 +318,6 @@ function renderSettingsDialog(
 
   return {
     onPersist,
-    onSilentUpdatePreferenceChange,
     onPersistComposioKey,
     onPersistByokCredential,
     onClose,
@@ -364,7 +356,6 @@ function renderLanguageSettingsDialog(initialLocale: Parameters<typeof I18nProvi
         initial={baseConfig}
         agents={availableAgents}
         daemonLive={true}
-        appVersionInfo={null}
         initialSection="language"
         onPersist={onPersist}
         onPersistComposioKey={vi.fn()}
@@ -515,7 +506,6 @@ describe('SettingsDialog privacy settings interactions', () => {
         initial={{ ...initial, agentId: 'codex' }}
         agents={availableAgents}
         daemonLive={true}
-        appVersionInfo={null}
         initialSection="privacy"
         onPersist={view.onPersist}
         onPersistComposioKey={view.onPersistComposioKey}
@@ -4703,7 +4693,6 @@ describe('SettingsDialog appearance interactions', () => {
         }}
         agents={[amrAgent, ...availableAgents]}
         daemonLive={true}
-        appVersionInfo={null}
         initialSection="appearance"
         onPersist={view.onPersist}
         onPersistComposioKey={view.onPersistComposioKey}
@@ -4873,7 +4862,6 @@ describe('SettingsDialog appearance interactions', () => {
           initial={{ ...baseConfig, theme: 'light' }}
           agents={availableAgents}
           daemonLive={true}
-          appVersionInfo={null}
           initialSection="appearance"
           onPersist={vi.fn()}
           onPersistComposioKey={vi.fn()}
@@ -5301,545 +5289,5 @@ describe('SettingsDialog design systems section', () => {
       expect(screen.getByText('Imported System')).toBeTruthy();
     });
     expect(screen.queryByText('No items match your search.')).toBeNull();
-  });
-});
-
-describe('SettingsDialog about interactions', () => {
-  afterEach(() => {
-    cleanup();
-  });
-
-  it('renders app version and runtime details when version info is available', () => {
-    renderSettingsDialog(
-      { mode: 'daemon', agentId: 'codex' },
-      {
-        initialSection: 'about',
-        appVersionInfo: {
-          version: '0.4.1',
-          channel: 'beta',
-          packaged: true,
-          platform: 'darwin',
-          arch: 'arm64',
-        },
-      },
-    );
-
-    expect(screen.getByText('Version')).toBeTruthy();
-    expect(screen.getByText('0.4.1')).toBeTruthy();
-    expect(screen.getByText('Channel')).toBeTruthy();
-    expect(screen.getByText('beta')).toBeTruthy();
-    expect(screen.getByText('Runtime')).toBeTruthy();
-    expect(screen.getByText('Packaged app')).toBeTruthy();
-    expect(screen.getByText('Platform')).toBeTruthy();
-    expect(screen.getByText('darwin')).toBeTruthy();
-    expect(screen.getByText('Architecture')).toBeTruthy();
-    expect(screen.getByText('arm64')).toBeTruthy();
-  });
-
-  it('renders the unavailable fallback when app version info is missing', () => {
-    renderSettingsDialog(
-      { mode: 'daemon', agentId: 'codex' },
-      { initialSection: 'about', appVersionInfo: null },
-    );
-
-    expect(
-      screen.getByText(/Version details are unavailable while the daemon is offline\./i),
-    ).toBeTruthy();
-  });
-
-  it('does not create dirty state on the about page', () => {
-    const first = renderSettingsDialog(
-      { mode: 'daemon', agentId: 'codex' },
-      {
-        initialSection: 'about',
-        appVersionInfo: {
-          version: '0.4.1',
-          channel: 'beta',
-          packaged: false,
-          platform: 'linux',
-          arch: 'x64',
-        },
-      },
-    );
-
-    fireEvent.click(first.container.querySelector('.settings-close') as HTMLElement);
-    expect(first.onClose).toHaveBeenCalledTimes(1);
-
-    cleanup();
-
-    const second = renderSettingsDialog(
-      { mode: 'daemon', agentId: 'codex' },
-      {
-        initialSection: 'about',
-        appVersionInfo: {
-          version: '0.4.1',
-          channel: 'beta',
-          packaged: false,
-          platform: 'linux',
-          arch: 'x64',
-        },
-      },
-    );
-
-    fireEvent.click(document.querySelector('.modal-backdrop') as HTMLElement);
-    expect(second.onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('shows development builds as unsupported for in-app updates', () => {
-    renderSettingsDialog(
-      { mode: 'daemon', agentId: 'codex' },
-      {
-        initialSection: 'about',
-        appVersionInfo: {
-          version: '0.4.1',
-          channel: 'beta',
-          packaged: false,
-          platform: 'darwin',
-          arch: 'arm64',
-        },
-      },
-    );
-
-    expect(screen.getByText(en['settings.updateStatusDevelopment'])).toBeTruthy();
-    expect(screen.queryByRole('button', { name: en['settings.installLatest'] })).toBeNull();
-    expect(screen.queryByRole('combobox')).toBeNull();
-
-    fireEvent.click(screen.getByRole('button', { name: en['settings.updateViewReleases'] }));
-
-    expect(openExternalUrlMock).toHaveBeenCalledWith('https://github.com/nexu-io/open-design/releases');
-  });
-
-  it('downloads an available packaged update from the about page', async () => {
-    const available = updateStatus({
-      availableVersion: '1.2.3-beta.4',
-      state: 'available',
-    });
-    const downloaded = updateStatus({
-      artifact: {
-        name: 'Open Design Beta.dmg',
-        platformKey: 'macAppleSilicon',
-        type: 'dmg',
-        url: 'https://fixture.test/Open Design Beta.dmg',
-      },
-      availableVersion: '1.2.3-beta.4',
-      downloadPath: '/tmp/open-design-updater/Open Design Beta.dmg',
-      state: 'downloaded',
-    });
-    const download = vi.fn(async () => downloaded);
-    restoreOpenDesignHost = installMockOpenDesignHost({
-      host: {
-        updater: {
-          download,
-          status: vi.fn(async () => available),
-        },
-      },
-    });
-
-    renderSettingsDialog(
-      { mode: 'daemon', agentId: 'codex' },
-      {
-        initialSection: 'about',
-        appVersionInfo: {
-          version: '1.2.3-beta.3',
-          channel: 'beta',
-          packaged: true,
-          platform: 'darwin',
-          arch: 'arm64',
-        },
-      },
-    );
-
-    expect(
-      await screen.findByText('New version 1.2.3-beta.4 found. Preparing download.'),
-    ).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('button', { name: en['updater.download'] }));
-
-    await waitFor(() => {
-      expect(download).toHaveBeenCalledWith({ payload: { source: 'settings-about' } });
-    });
-    expect(screen.getByText('Version 1.2.3-beta.4 is ready to install.')).toBeTruthy();
-  });
-
-  it('clears the updater cache from the about page after inline confirmation', async () => {
-    const cleared = updateStatus({ state: 'idle' });
-    const clearCache = vi.fn(async () => cleared);
-    restoreOpenDesignHost = installMockOpenDesignHost({
-      host: {
-        updater: {
-          'clear-cache': clearCache,
-          status: vi.fn(async () => updateStatus()),
-        },
-      },
-    });
-
-    renderSettingsDialog(
-      { mode: 'daemon', agentId: 'codex' },
-      {
-        initialSection: 'about',
-        appVersionInfo: {
-          version: '1.2.3-beta.3',
-          channel: 'beta',
-          packaged: true,
-          platform: 'darwin',
-          arch: 'arm64',
-        },
-      },
-    );
-
-    // Two-stage inline confirm: the first click only arms the action.
-    const trigger = await screen.findByTestId('settings-clear-updater-cache');
-    fireEvent.click(trigger);
-    expect(clearCache).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByTestId('settings-clear-updater-cache-confirm'));
-
-    await waitFor(() => {
-      expect(clearCache).toHaveBeenCalled();
-    });
-    expect(await screen.findByText(en['settings.clearUpdaterCacheSuccess'])).toBeTruthy();
-  });
-
-  it('hides updater cache recovery when packaged updates are unsupported', async () => {
-    restoreOpenDesignHost = installMockOpenDesignHost({
-      host: {
-        updater: {
-          status: vi.fn(async () => updateStatus({
-            platform: 'linux',
-            state: 'unsupported',
-            supported: false,
-          })),
-        },
-      },
-    });
-
-    renderSettingsDialog(
-      { mode: 'daemon', agentId: 'codex' },
-      {
-        initialSection: 'about',
-        appVersionInfo: {
-          version: '1.2.3-beta.3',
-          channel: 'beta',
-          packaged: true,
-          platform: 'linux',
-          arch: 'x64',
-        },
-      },
-    );
-
-    await screen.findByText(en['settings.updateStatusUnsupported']);
-    expect(screen.queryByTestId('settings-clear-updater-cache')).toBeNull();
-  });
-
-  it('installs a downloaded payload update from the about page', async () => {
-    const payloadReady = updateStatus({
-      artifact: {
-        name: 'open-design-1.2.3-beta.4-mac-arm64-payload.zip',
-        platformKey: 'mac',
-        type: 'payload',
-        url: 'https://fixture.test/open-design-1.2.3-beta.4-mac-arm64-payload.zip',
-      },
-      availableVersion: '1.2.3-beta.4',
-      capabilities: {
-        canApplyInPlace: true,
-        canDownload: true,
-        canOpenInstaller: false,
-        requiresManualInstall: false,
-      },
-      downloadPath: '/tmp/open-design-updater/open-design-1.2.3-beta.4-mac-arm64-payload.zip',
-      state: 'downloaded',
-    });
-    const installing = updateStatus({
-      ...payloadReady,
-      state: 'installing',
-    });
-    const install = vi.fn(async () => installing);
-    const quit = vi.fn(async () => ({ ok: true as const }));
-    restoreOpenDesignHost = installMockOpenDesignHost({
-      host: {
-        updater: {
-          install,
-          quit,
-          status: vi.fn(async () => payloadReady),
-        },
-      },
-    });
-
-    renderSettingsDialog(
-      { mode: 'daemon', agentId: 'codex' },
-      {
-        initialSection: 'about',
-        appVersionInfo: {
-          version: '1.2.3-beta.3',
-          channel: 'beta',
-          packaged: true,
-          platform: 'darwin',
-          arch: 'arm64',
-        },
-      },
-    );
-
-    expect(await screen.findByText('Version 1.2.3-beta.4 is ready to install.')).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('button', { name: en['updater.installRestart'] }));
-
-    await waitFor(() => {
-      expect(install).toHaveBeenCalledWith({ payload: { source: 'settings-about' } });
-    });
-    await waitFor(() => {
-      expect(quit).toHaveBeenCalledWith({ payload: { source: 'settings-about' } });
-    });
-  });
-
-  it('keeps a quit retry action when update install succeeds but quit throws or fails', async () => {
-    const payloadReady = updateStatus({
-      artifact: {
-        name: 'open-design-1.2.3-beta.4-mac-arm64-payload.zip',
-        platformKey: 'mac',
-        type: 'payload',
-        url: 'https://fixture.test/open-design-1.2.3-beta.4-mac-arm64-payload.zip',
-      },
-      availableVersion: '1.2.3-beta.4',
-      capabilities: {
-        canApplyInPlace: true,
-        canDownload: true,
-        canOpenInstaller: false,
-        requiresManualInstall: false,
-      },
-      downloadPath: '/tmp/open-design-updater/open-design-1.2.3-beta.4-mac-arm64-payload.zip',
-      state: 'downloaded',
-    });
-    const installed = updateStatus({
-      ...payloadReady,
-      installResult: {
-        dryRun: true,
-        openedAt: '2026-05-19T00:00:00.000Z',
-        path: '/tmp/open-design-updater/open-design-1.2.3-beta.4-mac-arm64-payload.zip',
-      },
-    });
-    const install = vi.fn(async () => installed);
-    const quit = vi.fn()
-      .mockRejectedValueOnce(new Error('desktop quit failed'))
-      .mockResolvedValue({
-        ok: false as const,
-        reason: 'desktop quit is not available',
-      });
-    restoreOpenDesignHost = installMockOpenDesignHost({
-      host: {
-        updater: {
-          install,
-          quit,
-          status: vi.fn(async () => payloadReady),
-        },
-      },
-    });
-
-    renderSettingsDialog(
-      { mode: 'daemon', agentId: 'codex' },
-      {
-        initialSection: 'about',
-        appVersionInfo: {
-          version: '1.2.3-beta.3',
-          channel: 'beta',
-          packaged: true,
-          platform: 'darwin',
-          arch: 'arm64',
-        },
-      },
-    );
-
-    fireEvent.click(await screen.findByRole('button', { name: en['updater.installRestart'] }));
-
-    await waitFor(() => {
-      expect(install).toHaveBeenCalledWith({ payload: { source: 'settings-about' } });
-    });
-    await waitFor(() => {
-      expect(quit).toHaveBeenCalledTimes(1);
-    });
-    expect(screen.getByRole('button', { name: en['updater.quitButton'] })).toBeTruthy();
-    expect(screen.getAllByText(en['updater.quitFailedTitle']).length).toBeGreaterThan(0);
-
-    fireEvent.click(screen.getByRole('button', { name: en['updater.quitButton'] }));
-
-    await waitFor(() => {
-      expect(quit).toHaveBeenCalledTimes(2);
-    });
-    expect(install).toHaveBeenCalledTimes(1);
-  });
-
-  it('toggles allowSilentUpdates via the non-optimistic Settings path without crashing', async () => {
-    const onSilentUpdatePreferenceChange = vi.fn(async () => undefined);
-    const { onPersist } = renderSettingsDialog(
-      { mode: 'daemon', agentId: 'codex', allowSilentUpdates: false },
-      {
-        initialSection: 'about',
-        appVersionInfo: {
-          version: '0.14.1',
-          channel: 'beta',
-          packaged: true,
-          platform: 'darwin',
-          arch: 'arm64',
-        },
-        onSilentUpdatePreferenceChange,
-      },
-    );
-
-    const checkbox = screen.getByTestId('settings-allow-silent-updates') as HTMLInputElement;
-    expect(checkbox.checked).toBe(false);
-
-    fireEvent.click(checkbox);
-    expect(checkbox.checked).toBe(true);
-    await waitFor(() => expect(onSilentUpdatePreferenceChange).toHaveBeenCalledWith(true));
-    // Must not go through optimistic handleConfigPersist autosave.
-    expect(onPersist).not.toHaveBeenCalled();
-
-    fireEvent.click(checkbox);
-    expect(checkbox.checked).toBe(false);
-    await waitFor(() => expect(onSilentUpdatePreferenceChange).toHaveBeenCalledWith(false));
-  });
-
-  it('reverts the Settings silent-update toggle when the non-optimistic save fails', async () => {
-    let appConfigSilent: boolean | undefined = false;
-    const onSilentUpdatePreferenceChange = vi.fn(async (value: boolean) => {
-      throw new Error('daemon offline');
-      appConfigSilent = value;
-    });
-    renderSettingsDialog(
-      { mode: 'daemon', agentId: 'codex', allowSilentUpdates: false },
-      {
-        initialSection: 'about',
-        appVersionInfo: {
-          version: '0.14.1',
-          channel: 'beta',
-          packaged: true,
-          platform: 'darwin',
-          arch: 'arm64',
-        },
-        onSilentUpdatePreferenceChange,
-      },
-    );
-
-    const checkbox = screen.getByTestId('settings-allow-silent-updates') as HTMLInputElement;
-    fireEvent.click(checkbox);
-    await waitFor(() => expect(onSilentUpdatePreferenceChange).toHaveBeenCalledWith(true));
-    await waitFor(() => {
-      expect((screen.getByTestId('settings-allow-silent-updates') as HTMLInputElement).checked).toBe(false);
-    });
-    // App-wide preference must not keep the rejected value.
-    expect(appConfigSilent).toBe(false);
-  });
-
-  it('disables the Settings silent-update checkbox while a save is in flight', async () => {
-    let resolveSave: (() => void) | null = null;
-    const onSilentUpdatePreferenceChange = vi.fn(
-      () => new Promise<void>((resolve) => {
-        resolveSave = resolve;
-      }),
-    );
-    renderSettingsDialog(
-      { mode: 'daemon', agentId: 'codex', allowSilentUpdates: false },
-      {
-        initialSection: 'about',
-        appVersionInfo: {
-          version: '0.14.1',
-          channel: 'beta',
-          packaged: true,
-          platform: 'darwin',
-          arch: 'arm64',
-        },
-        onSilentUpdatePreferenceChange,
-      },
-    );
-
-    const checkbox = screen.getByTestId('settings-allow-silent-updates') as HTMLInputElement;
-    fireEvent.click(checkbox);
-    await waitFor(() => expect(onSilentUpdatePreferenceChange).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(checkbox.disabled).toBe(true));
-
-    await act(async () => {
-      resolveSave?.();
-      await Promise.resolve();
-    });
-    await waitFor(() => expect(checkbox.disabled).toBe(false));
-    expect(onSilentUpdatePreferenceChange).toHaveBeenCalledTimes(1);
-  });
-
-  it('still autosaves an unrelated edit that lands during a silent-update save', async () => {
-    // Regression: success must only advance autosaveLastSavedRef for
-    // allowSilentUpdates. Spreading the whole latest draft would mark a
-    // concurrent theme (etc.) change as already saved and skip onPersist.
-    let resolveSave: (() => void) | null = null;
-    const onSilentUpdatePreferenceChange = vi.fn(
-      () => new Promise<void>((resolve) => {
-        resolveSave = resolve;
-      }),
-    );
-    const { onPersist } = renderSettingsDialog(
-      {
-        mode: 'daemon',
-        agentId: 'codex',
-        allowSilentUpdates: false,
-        theme: 'light',
-        accentColor: '#2563eb',
-      },
-      {
-        initialSection: 'about',
-        appVersionInfo: {
-          version: '0.14.1',
-          channel: 'beta',
-          packaged: true,
-          platform: 'darwin',
-          arch: 'arm64',
-        },
-        onSilentUpdatePreferenceChange,
-      },
-    );
-
-    fireEvent.click(screen.getByTestId('settings-allow-silent-updates'));
-    await waitFor(() => expect(onSilentUpdatePreferenceChange).toHaveBeenCalledTimes(1));
-    await waitFor(() => {
-      expect(
-        (screen.getByTestId('settings-allow-silent-updates') as HTMLInputElement).disabled,
-      ).toBe(true);
-    });
-    expect(onPersist).not.toHaveBeenCalled();
-
-    // Concurrent persisted edit while the silent-update request is in flight.
-    fireEvent.click(screen.getByRole('button', { name: /Appearance/i }));
-    fireEvent.click(screen.getByRole('radio', { name: '#059669' }));
-
-    // Resolve silent-update AFTER the concurrent edit is in draft. The success
-    // path must not stamp this accent into autosaveLastSavedRef.
-    await act(async () => {
-      resolveSave?.();
-      await Promise.resolve();
-    });
-
-    await waitForPersist(
-      onPersist,
-      expect.objectContaining({
-        accentColor: '#059669',
-      }),
-      {},
-    );
-  });
-
-  it('does not read event.currentTarget inside the silent-updates setCfg updater', async () => {
-    // Source invariant: functional updaters must not close over event.currentTarget
-    // (null after the native/React event handler returns under pending lanes).
-    const { readFile } = await import('node:fs/promises');
-    const { join } = await import('node:path');
-    const source = await readFile(
-      join(process.cwd(), 'src/components/SettingsDialog.tsx'),
-      'utf8',
-    );
-    const silentToggleBlock = source.match(
-      /data-testid="settings-allow-silent-updates"[\s\S]*?<\/label>/,
-    )?.[0];
-    expect(silentToggleBlock).toBeTruthy();
-    expect(silentToggleBlock).not.toMatch(
-      /setCfg\(\s*\(\s*current\s*\)\s*=>\s*\(\{[\s\S]*?event\.currentTarget\.checked/,
-    );
-    expect(silentToggleBlock).toMatch(/const allowSilentUpdates = event\.currentTarget\.checked/);
   });
 });

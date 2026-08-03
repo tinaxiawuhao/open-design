@@ -100,8 +100,6 @@ import { DesignSystemsTab } from './DesignSystemsTab';
 import { BrandsTab } from './BrandsTab';
 import { EntryNavRail, type EntryView as EntryViewKind } from './EntryNavRail';
 import { LibrarySection } from './LibrarySection';
-import { UpdaterPopup } from './UpdaterPopup';
-import { WhatsNewPopup } from './WhatsNewPopup';
 import { AmrBalanceDialog } from './AmrBalanceDialog';
 import { AmrLowBalanceDialog, type AmrLowBalanceDecision } from './AmrLowBalanceDialog';
 import { checkAmrBalanceGate } from '../runtime/amr-balance-gate';
@@ -231,7 +229,7 @@ type OnboardingAgentTestState =
 // client. Overridable at build time via NEXT_PUBLIC_NEWSLETTER_URL — e.g. point
 // it at a local `wrangler pages dev` instance during development.
 const NEWSLETTER_SUBSCRIBE_URL =
-  process.env.NEXT_PUBLIC_NEWSLETTER_URL ?? 'https://open-design.ai/subscribe';
+  process.env.NEXT_PUBLIC_NEWSLETTER_URL ?? '';
 const NEWSLETTER_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ONBOARDING_BYOK_AUTO_FETCH_DELAY_MS = 300;
 const ONBOARDING_BYOK_AUTO_TEST_DELAY_MS = 500;
@@ -1002,15 +1000,6 @@ export function EntryShell({
             <div className="entry-main__topbar-chips entry-main__topbar-chips--icon-only">
               {view === 'home' ? null : executionSwitcher}
             </div>
-            <UpdaterPopup
-              allowSilentUpdates={config.allowSilentUpdates}
-              silentUpdatePreferenceReady={daemonAppConfigReady}
-              onAllowSilentUpdatesChange={
-                onSilentUpdatePreferenceChange
-                  ?? ((allowSilentUpdates) => onConfigPersist({ ...config, allowSilentUpdates }))
-              }
-            />
-            <WhatsNewPopup active={view === 'home'} />
             <MessageCenter
               onOpenNotificationSettings={() => onOpenSettings('notifications')}
             />

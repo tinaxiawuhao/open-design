@@ -528,7 +528,6 @@ function renderDialog(
       initial={initial}
       agents={SAVEABLE_AGENTS}
       daemonLive
-      appVersionInfo={null}
       initialSection="media"
       onPersist={options?.onPersist ?? vi.fn()}
       onPersistComposioKey={vi.fn()}

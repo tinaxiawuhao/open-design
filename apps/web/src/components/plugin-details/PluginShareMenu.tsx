@@ -21,10 +21,6 @@ import { Icon } from '../Icon';
 import { useT } from '../../i18n';
 import { copyToClipboard } from '../../lib/copy-to-clipboard';
 import { derivePluginSourceLinks } from '../../runtime/plugin-source';
-import { pluginShareUrl } from '@open-design/contracts';
-
-const PUBLIC_OPEN_DESIGN_MARKETPLACE_ID = 'official';
-const PUBLIC_COMMUNITY_MARKETPLACE_ID = 'community';
 
 interface Props {
   record: InstalledPluginRecord;
@@ -76,28 +72,13 @@ function buildInstallCommand(record: InstalledPluginRecord): string {
   return `od plugin install ${record.source}`;
 }
 
-export function buildPluginShareUrl(record: InstalledPluginRecord): string | null {
-  // Only plugins with a public detail page on open-design.ai get a shareable
-  // link: bundled (`_official`) plugins and ones installed from the official
-  // or community marketplace. Local/github installs have no public page, so
-  // no link — never leak a local tools-dev origin (127.0.0.1:<port>).
-  const hasPublicPage =
-    record.sourceKind === 'bundled' ||
-    record.sourceMarketplaceId === PUBLIC_OPEN_DESIGN_MARKETPLACE_ID ||
-    record.sourceMarketplaceId === PUBLIC_COMMUNITY_MARKETPLACE_ID;
-  if (!hasPublicPage) return null;
-  // Community marketplace entry names use the `community/<folder>` path form
-  // (e.g. `community/registry-starter`). pluginDetailSlug takes the last
-  // slash-separated segment, producing `registry-starter` — the same
-  // single-segment slug the landing page emits via routeId. Community plugin
-  // manifest names carry a `community-` prefix, so using them directly would
-  // produce a mismatched slug (`community-registry-starter`).
-  const id =
-    record.sourceMarketplaceId === PUBLIC_COMMUNITY_MARKETPLACE_ID &&
-    typeof record.sourceMarketplaceEntryName === 'string'
-      ? record.sourceMarketplaceEntryName
-      : (record.manifest?.name ?? record.id);
-  return pluginShareUrl(id);
+export function buildPluginShareUrl(_record: InstalledPluginRecord): string | null {
+  // Public open-design.ai plugin detail pages have been disabled for this
+  // deployment, so no shareable public link is produced. Local/github
+  // installs already had no public page; now marketplace/bundled installs
+  // are also without one. The share menu falls back to the in-app
+  // /marketplace route via buildPluginMarketplacePath.
+  return null;
 }
 
 function buildPluginMarketplacePath(record: InstalledPluginRecord): string {
@@ -203,8 +184,8 @@ export function PluginShareMenu({ record, variant = 'default' }: Props) {
     key: 'marketplace',
     label: t('plugins.actions.openMarketplace'),
     icon: 'eye',
-    // Prefer the public open-design.ai detail page; fall back to the in-app
-    // /marketplace route only for local/github installs with no public page.
+    // Public open-design.ai detail page is disabled; always use the in-app
+    // /marketplace route.
     href: publicShareUrl ?? buildPluginMarketplacePath(record),
   });
 

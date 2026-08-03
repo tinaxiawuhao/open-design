@@ -1110,7 +1110,7 @@ export function LibrarySection({ active, onOpenProject }: Props) {
           </p>
           <a
             className={styles.clipperDownload}
-            href="https://open-design.ai/clipper"
+            href=""
             target="_blank"
             rel="noreferrer"
           >

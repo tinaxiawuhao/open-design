@@ -4,10 +4,7 @@
 // wide one. Opens in the external browser. In local dev we point at the
 // landing-page dev server (astro dev, port 17574) so the full button → form
 // flow is walkable before the page ships to prod.
-const ENTERPRISE_BASE =
-  process.env.NODE_ENV === 'development'
-    ? 'http://127.0.0.1:17574'
-    : 'https://open-design.ai';
+const ENTERPRISE_BASE = '';
 
 // Map the client's active locale to an active landing-page locale segment so
 // the enterprise page opens in the same language the user is already reading.

@@ -4,7 +4,6 @@ import {
   amrWalletValueLabel,
   canFetchProviderModels,
   canRunProviderConnectionTest,
-  deriveAboutUpdateControl,
   deriveComposioCredentialState,
   configForManualOrbitRun,
   isOrbitRunDisabled,
@@ -22,9 +21,7 @@ import {
   updateAgentCliEnvValue,
   updateCurrentApiProtocolConfig,
 } from '../../src/components/SettingsDialog';
-import { deriveUpdaterModel } from '../../src/lib/updater';
-import type { OpenDesignHostUpdaterStatusSnapshot } from '@open-design/host';
-import type { AppConfig, AppVersionInfo, ConnectionTestResponse } from '../../src/types';
+import type { AppConfig, ConnectionTestResponse } from '../../src/types';
 
 const originalFetch = globalThis.fetch;
 
@@ -40,276 +37,10 @@ const baseConfig: AppConfig = {
   designSystemId: null,
 };
 
-const packagedVersion: AppVersionInfo = {
-  arch: 'arm64',
-  channel: 'beta',
-  packaged: true,
-  platform: 'darwin',
-  version: '1.2.3-beta.3',
-};
-
-function updateStatus(
-  overrides: Partial<OpenDesignHostUpdaterStatusSnapshot> = {},
-): OpenDesignHostUpdaterStatusSnapshot {
-  return {
-    arch: 'arm64',
-    capabilities: {
-      canApplyInPlace: false,
-      canDownload: true,
-      canOpenInstaller: true,
-      requiresManualInstall: true,
-    },
-    channel: 'beta',
-    currentVersion: '1.2.3-beta.3',
-    enabled: true,
-    mode: 'package-launcher',
-    platform: 'darwin',
-    state: 'idle',
-    supported: true,
-    ...overrides,
-  };
-}
-
 afterEach(() => {
   globalThis.fetch = originalFetch;
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
-});
-
-describe('SettingsDialog about update control', () => {
-  it('shows a check action before updates have been checked', () => {
-    const control = deriveAboutUpdateControl(
-      deriveUpdaterModel(updateStatus(), { hostAvailable: true }),
-      packagedVersion,
-    );
-
-    expect(control).toMatchObject({
-      primaryAction: 'check',
-      primaryLabelKey: 'settings.updateCheck',
-      statusKey: 'settings.updateStatusNotChecked',
-    });
-  });
-
-  it('shows up-to-date status without turning the primary action into a release link', () => {
-    const control = deriveAboutUpdateControl(
-      deriveUpdaterModel(updateStatus({ state: 'not-available' }), { hostAvailable: true }),
-      packagedVersion,
-    );
-
-    expect(control).toMatchObject({
-      primaryAction: 'check',
-      primaryLabelKey: 'settings.updateRecheck',
-      showReleaseLink: true,
-      statusKey: 'settings.updateStatusUpToDate',
-      statusTone: 'success',
-    });
-  });
-
-  it('offers download when an update is available', () => {
-    const control = deriveAboutUpdateControl(
-      deriveUpdaterModel(
-        updateStatus({
-          availableVersion: '1.2.3-beta.4',
-          state: 'available',
-        }),
-        { hostAvailable: true },
-      ),
-      packagedVersion,
-    );
-
-    expect(control).toMatchObject({
-      primaryAction: 'download',
-      primaryLabelKey: 'updater.download',
-      statusKey: 'settings.updateStatusAvailable',
-      statusVars: { version: '1.2.3-beta.4' },
-    });
-  });
-
-  it('disables the primary action while downloading and keeps progress visible', () => {
-    const control = deriveAboutUpdateControl(
-      deriveUpdaterModel(
-        updateStatus({
-          incoming: {
-            arch: 'arm64',
-            artifact: {
-              name: 'Open Design Beta.dmg',
-              platformKey: 'macAppleSilicon',
-              type: 'dmg',
-              url: 'https://fixture.test/Open Design Beta.dmg',
-            },
-            channel: 'beta',
-            progress: {
-              receivedBytes: 25,
-              totalBytes: 100,
-            },
-            startedAt: '2026-06-16T00:00:00.000Z',
-            version: '1.2.3-beta.4',
-          },
-          state: 'downloading',
-        }),
-        { hostAvailable: true },
-      ),
-      packagedVersion,
-    );
-
-    expect(control).toMatchObject({
-      primaryAction: null,
-      primaryLabelKey: 'updater.downloading',
-      statusKey: 'settings.updateStatusDownloadingPercent',
-      statusVars: { percent: 25 },
-    });
-  });
-
-  it('offers install when an update has already downloaded', () => {
-    const control = deriveAboutUpdateControl(
-      deriveUpdaterModel(
-        updateStatus({
-          artifact: {
-            name: 'Open Design Beta.dmg',
-            platformKey: 'macAppleSilicon',
-            type: 'dmg',
-            url: 'https://fixture.test/Open Design Beta.dmg',
-          },
-          availableVersion: '1.2.3-beta.4',
-          downloadPath: '/tmp/Open Design Beta.dmg',
-          state: 'downloaded',
-        }),
-        { hostAvailable: true },
-      ),
-      packagedVersion,
-    );
-
-    expect(control).toMatchObject({
-      primaryAction: 'install',
-      primaryLabelKey: 'settings.updateNow',
-      statusKey: 'settings.updateStatusReady',
-      statusVars: { version: '1.2.3-beta.4' },
-    });
-  });
-
-  it('offers install and restart when a payload update has already downloaded', () => {
-    const control = deriveAboutUpdateControl(
-      deriveUpdaterModel(
-        updateStatus({
-          artifact: {
-            name: 'open-design-1.2.3-beta.4-mac-arm64-payload.zip',
-            platformKey: 'mac',
-            type: 'payload',
-            url: 'https://fixture.test/open-design-1.2.3-beta.4-mac-arm64-payload.zip',
-          },
-          availableVersion: '1.2.3-beta.4',
-          capabilities: {
-            canApplyInPlace: true,
-            canDownload: true,
-            canOpenInstaller: false,
-            requiresManualInstall: false,
-          },
-          downloadPath: '/tmp/open-design-updater/open-design-1.2.3-beta.4-mac-arm64-payload.zip',
-          state: 'downloaded',
-        }),
-        { hostAvailable: true },
-      ),
-      packagedVersion,
-    );
-
-    expect(control).toMatchObject({
-      primaryAction: 'install',
-      primaryLabelKey: 'updater.installRestart',
-      statusKey: 'settings.updateStatusReady',
-      statusVars: { version: '1.2.3-beta.4' },
-    });
-  });
-
-  it('shows installer handoff without claiming that quit failed', () => {
-    const control = deriveAboutUpdateControl(
-      deriveUpdaterModel(
-        updateStatus({
-          artifact: {
-            name: 'Open Design Beta.dmg',
-            platformKey: 'macAppleSilicon',
-            type: 'dmg',
-            url: 'https://fixture.test/Open Design Beta.dmg',
-          },
-          availableVersion: '1.2.3-beta.4',
-          downloadPath: '/tmp/Open Design Beta.dmg',
-          installResult: {
-            dryRun: true,
-            openedAt: '2026-05-19T00:00:00.000Z',
-            path: '/tmp/Open Design Beta.dmg',
-          },
-          state: 'downloaded',
-        }),
-        { hostAvailable: true },
-      ),
-      packagedVersion,
-    );
-
-    expect(control).toMatchObject({
-      primaryAction: 'quit',
-      primaryLabelKey: 'updater.quitButton',
-      showReleaseLink: false,
-      statusKey: 'updater.opening',
-      statusTone: 'neutral',
-    });
-  });
-
-  it('turns update errors into a retry action', () => {
-    const control = deriveAboutUpdateControl(
-      deriveUpdaterModel(updateStatus({ state: 'error' }), { hostAvailable: true }),
-      packagedVersion,
-    );
-
-    expect(control).toMatchObject({
-      primaryAction: 'check',
-      primaryLabelKey: 'settings.updateRetry',
-      statusKey: 'updater.failed',
-      statusTone: 'error',
-    });
-  });
-
-  it('retries updater errors from the last actionable phase', () => {
-    const downloadRetry = deriveAboutUpdateControl(
-      deriveUpdaterModel(
-        updateStatus({ availableVersion: '1.2.3-beta.4', state: 'error' }),
-        { hostAvailable: true },
-      ),
-      packagedVersion,
-    );
-    const installRetry = deriveAboutUpdateControl(
-      deriveUpdaterModel(
-        updateStatus({
-          availableVersion: '1.2.3-beta.4',
-          downloadPath: '/tmp/Open Design Beta.dmg',
-          state: 'error',
-        }),
-        { hostAvailable: true },
-      ),
-      packagedVersion,
-    );
-
-    expect(downloadRetry.primaryAction).toBe('download');
-    expect(installRetry.primaryAction).toBe('install');
-  });
-
-  it('does not offer in-app update actions in development or web-only contexts', () => {
-    const developmentControl = deriveAboutUpdateControl(
-      deriveUpdaterModel(updateStatus(), { hostAvailable: true }),
-      { ...packagedVersion, packaged: false },
-    );
-    const webControl = deriveAboutUpdateControl(
-      deriveUpdaterModel(null, { hostAvailable: false }),
-      packagedVersion,
-    );
-
-    expect(developmentControl).toMatchObject({
-      primaryAction: null,
-      statusKey: 'settings.updateStatusDevelopment',
-    });
-    expect(webControl).toMatchObject({
-      primaryAction: null,
-      statusKey: 'settings.updateStatusUnsupported',
-    });
-  });
 });
 
 describe('SettingsDialog API protocol switching', () => {
@@ -1345,7 +1076,6 @@ describe('shouldEnableSettingsSave', () => {
     expect(shouldEnableSettingsSave(incompleteApiCfg, 'notifications', [availableAgent], true)).toBe(true);
     expect(shouldEnableSettingsSave(incompleteApiCfg, 'pet', [availableAgent], true)).toBe(true);
     expect(shouldEnableSettingsSave(incompleteApiCfg, 'designSystems', [availableAgent], true)).toBe(true);
-    expect(shouldEnableSettingsSave(incompleteApiCfg, 'about', [availableAgent], true)).toBe(true);
   });
 
   it('on execution + daemon: returns true only when an available agent is selected', () => {
@@ -1491,7 +1221,6 @@ describe('sanitizeSettingsSavePayload', () => {
       'notifications',
       'pet',
       'designSystems',
-      'about',
     ];
     for (const section of sections) {
       const sanitized = sanitizeSettingsSavePayload(

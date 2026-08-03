@@ -114,7 +114,6 @@ function renderOrbitSettings(
       }}
       agents={[]}
       daemonLive
-      appVersionInfo={null}
       initialSection="orbit"
       onPersist={onPersist}
       onPersistComposioKey={vi.fn<(composio: AppConfig['composio']) => void>()}
@@ -159,8 +158,7 @@ describe('SettingsDialog Orbit connector gate refresh', () => {
       <SettingsDialog
         initial={baseConfig}
         agents={[]}
-        daemonLive
-        appVersionInfo={null}
+        daemonLive
         initialSection="orbit"
         onPersist={vi.fn()}
         onPersistComposioKey={vi.fn()}
@@ -205,7 +203,6 @@ describe('SettingsDialog Orbit connector gate refresh', () => {
           initial={baseConfig}
           agents={[]}
           daemonLive
-          appVersionInfo={null}
           initialSection="orbit"
           onPersist={vi.fn()}
           onPersistComposioKey={vi.fn()}
@@ -356,8 +353,7 @@ describe('SettingsDialog Orbit connector gate refresh', () => {
       <SettingsDialog
         initial={baseConfig}
         agents={[]}
-        daemonLive
-        appVersionInfo={null}
+        daemonLive
         initialSection="orbit"
         onPersist={vi.fn()}
         onPersistComposioKey={vi.fn()}
@@ -415,8 +411,7 @@ describe('SettingsDialog Orbit connector gate refresh', () => {
       <SettingsDialog
         initial={baseConfig}
         agents={[]}
-        daemonLive
-        appVersionInfo={null}
+        daemonLive
         initialSection="orbit"
         onPersist={vi.fn()}
         onPersistComposioKey={vi.fn()}
@@ -556,8 +551,7 @@ describe('SettingsDialog Orbit connector gate refresh', () => {
       <SettingsDialog
         initial={baseConfig}
         agents={[]}
-        daemonLive
-        appVersionInfo={null}
+        daemonLive
         initialSection="orbit"
         onPersist={vi.fn()}
         onPersistComposioKey={vi.fn()}
@@ -627,8 +621,7 @@ describe('SettingsDialog Orbit connector gate refresh', () => {
       <SettingsDialog
         initial={baseConfig}
         agents={[]}
-        daemonLive
-        appVersionInfo={null}
+        daemonLive
         initialSection="orbit"
         onPersist={vi.fn()}
         onPersistComposioKey={vi.fn()}
@@ -683,8 +676,7 @@ describe('SettingsDialog Orbit connector gate refresh', () => {
       <SettingsDialog
         initial={baseConfig}
         agents={[]}
-        daemonLive
-        appVersionInfo={null}
+        daemonLive
         initialSection="orbit"
         onPersist={vi.fn()}
         onPersistComposioKey={vi.fn()}
@@ -755,8 +747,7 @@ describe('SettingsDialog Orbit connector gate refresh', () => {
       <SettingsDialog
         initial={baseConfig}
         agents={[]}
-        daemonLive
-        appVersionInfo={null}
+        daemonLive
         initialSection="orbit"
         onPersist={vi.fn()}
         onPersistComposioKey={vi.fn()}
@@ -839,8 +830,7 @@ describe('SettingsDialog Orbit connector gate refresh', () => {
           },
         }}
         agents={[]}
-        daemonLive
-        appVersionInfo={null}
+        daemonLive
         initialSection="orbit"
         onPersist={vi.fn()}
         onPersistComposioKey={vi.fn()}

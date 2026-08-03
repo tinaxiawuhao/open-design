@@ -26,15 +26,12 @@ import { MarketplaceView } from './components/MarketplaceView';
 import { PluginDetailView } from './components/PluginDetailView';
 import type { CreateInput, ImportClaudeDesignOutcome } from './components/NewProjectPanel';
 import { MemoryToast } from './components/MemoryToast';
-import { UpdateDialog } from './components/UpdateDialog';
 import { Toast } from './components/Toast';
 import { CenteredLoader } from './components/Loading';
 import { PetOverlay, type PetTaskCenter } from './components/pet/PetOverlay';
 import { buildPetTaskCenter } from './components/pet/taskCenter';
 import { migrateCustomPetAtlas } from './components/pet/pets';
 import { ProjectView } from './components/ProjectView';
-import { AmrArtifactUpgradeGate } from './components/AmrArtifactUpgradeGate';
-import { AmrArtifactUpgradeHomeCard } from './components/AmrArtifactUpgradeHomeCard';
 import { TooltipLayer } from './components/TooltipLayer';
 import { openWorkspaceTab, WorkspaceTabsBar } from './components/WorkspaceTabsBar';
 import {
@@ -52,10 +49,8 @@ import {
   type SettingsSection,
   type SettingsHighlight,
 } from './components/SettingsDialog';
-import { PrivacyConsentModal } from './components/PrivacyConsentModal';
 import {
   daemonIsLive,
-  fetchAppVersionInfo,
   fetchAgentsStream,
   fetchDesignSystems,
   fetchDesignTemplates,
@@ -65,7 +60,6 @@ import {
   uploadProjectFiles,
   replaceProjectWorkingDir,
 } from './providers/registry';
-import { openFirstPartyExternalLinkFromClick } from './first-party-external-link';
 import {
   RUNS_CHANGED_EVENT,
   fetchAmrModels,
@@ -129,7 +123,6 @@ import type {
   AgentModelChoice,
   ApiProtocol,
   AppConfig,
-  AppVersionInfo,
   ChatAttachment,
   DesignSystemGenerationJob,
   DesignSystemSummary,
@@ -411,15 +404,6 @@ function AppInner() {
   const iframeKeepAlivePool = useIframeKeepAlivePool();
   const clientType = useMemo(() => detectClientType(), []);
   useModalWindowDragGuard();
-  useEffect(() => {
-    const onFirstPartyExternalLink = (event: MouseEvent) => openFirstPartyExternalLinkFromClick(
-      event,
-      (url) => { void openExternalUrl(url); },
-    );
-    // React handlers append AMR attribution while the event bubbles; bridge the final URL afterwards.
-    document.addEventListener('click', onFirstPartyExternalLink);
-    return () => document.removeEventListener('click', onFirstPartyExternalLink);
-  }, []);
   // Observability marker. `apps/web/src/observability/white-screen.ts`
   // keys its "app actually mounted" success condition on this attribute
   // because the dynamic-import loading shell (`<div class="od-loading-shell">
@@ -500,9 +484,6 @@ function AppInner() {
   const [promptTemplates, setPromptTemplates] = useState<
     PromptTemplateSummary[]
   >([]);
-  const [appVersionInfo, setAppVersionInfo] = useState<AppVersionInfo | null>(
-    null,
-  );
   const [daemonMediaProviders, setDaemonMediaProviders] = useState<
     AppConfig['mediaProviders'] | null
   >(null);
@@ -769,21 +750,6 @@ function AppInner() {
   // {active:false} if this hasn't run.
   const activeProjectId = route.kind === 'project' ? route.projectId : null;
   const activeFileName = route.kind === 'project' ? route.fileName : null;
-  // Gate the privacy banner on three things:
-  //   1. Daemon config has hydrated (privacyDecisionAt is daemon-owned).
-  //   2. The user has not yet made a privacy decision.
-  //   3. Onboarding is complete (Skip and design-system creation both flip
-  //      onboardingCompleted to true; see handleCompleteOnboarding wiring).
-  // Once onboarding is done the banner is allowed on any route — including
-  // the project view the design-system finish path drops the user into, so
-  // they can read and acknowledge the disclosure while the first generation
-  // is running. Settings is irrelevant to visibility; the banner sits above
-  // the modal-backdrop layer in index.css so opening Settings does not hide
-  // it.
-  const showPrivacyConsent =
-    daemonConfigLoaded &&
-    config.privacyDecisionAt == null &&
-    config.onboardingCompleted === true;
   useEffect(() => {
     const body = activeProjectId
       ? { projectId: activeProjectId, fileName: activeFileName }
@@ -1000,11 +966,6 @@ function AppInner() {
         if (cancelled) return;
         setPromptTemplates(list);
         setPromptTemplatesLoading(false);
-      });
-
-      void fetchAppVersionInfo().then((info) => {
-        if (cancelled) return;
-        setAppVersionInfo(info);
       });
 
       const legacyByokMigration =
@@ -1346,23 +1307,6 @@ function AppInner() {
   const handleSettingsDraftChange = useCallback((draft: AppConfig) => {
     settingsDraftConfigRef.current = draft;
   }, []);
-
-  const handlePrivacyConsentChoice = useCallback((share: boolean) => {
-    const base = settingsDraftConfigRef.current ?? latestPersistedConfigRef.current;
-    const installationId = share
-      ? base.installationId ?? generateInstallationIdSafe()
-      : null;
-    void handleConfigPersist({
-      ...base,
-      installationId,
-      privacyDecisionAt: Date.now(),
-      telemetry: {
-        ...(base.telemetry ?? {}),
-        metrics: share,
-        content: share,
-      },
-    });
-  }, [handleConfigPersist]);
 
   /**
    * Explicit Composio API-key save. Called from the section-local
@@ -2594,39 +2538,6 @@ function AppInner() {
         onPersistComposioKey={handleConfigPersistComposioKey}
         onOpenSettings={openSettings}
         onCompleteOnboarding={handleCompleteOnboarding}
-        artifactUpgradeSlot={
-          amrArtifactUpgradeHomeOffer ? (
-            <AmrArtifactUpgradeHomeCard
-              key={amrArtifactUpgradeHomeOffer.sessionKey}
-              profile={amrLoginStatus?.profile ?? null}
-              metricsConsent={config.telemetry?.metrics === true}
-              installationId={config.installationId}
-              onViewArtifact={() => {
-                if (
-                  !amrArtifactUpgradeHomeOffer.projectId
-                  || !amrArtifactUpgradeHomeOffer.conversationId
-                ) {
-                  navigate({ kind: 'home', view: 'projects' });
-                  return;
-                }
-                navigate({
-                  kind: 'project',
-                  projectId: amrArtifactUpgradeHomeOffer.projectId,
-                  conversationId: amrArtifactUpgradeHomeOffer.conversationId,
-                  fileName: amrArtifactUpgradeHomeOffer.fileName,
-                });
-              }}
-              onDismiss={() => {
-                if (amrArtifactUpgradeHomeMock) return;
-                setAmrArtifactUpgradeHomeOffer((current) =>
-                  current?.sessionKey === amrArtifactUpgradeHomeOffer.sessionKey
-                    ? null
-                    : current,
-                );
-              }}
-            />
-          ) : undefined
-        }
       />
     );
   }
@@ -2659,28 +2570,6 @@ function AppInner() {
         />
       )}
       <TooltipLayer />
-      <UpdateDialog />
-      <AmrArtifactUpgradeGate
-        homeVisible={route.kind === 'home' && route.view === 'home'}
-        activeProjectId={route.kind === 'project' ? route.projectId : null}
-        activeConversationId={
-          route.kind === 'project' ? route.conversationId ?? null : null
-        }
-        activeFileName={route.kind === 'project' ? route.fileName : null}
-        plan={resolvedAmrPlan}
-        planResolved={
-          amrLoginStatus !== null
-          && (amrLoginStatus.loggedIn === false || resolvedAmrPlan !== null)
-        }
-        profile={amrLoginStatus?.profile ?? null}
-        metricsConsent={config.telemetry?.metrics === true}
-        installationId={config.installationId}
-        onHomeOfferChange={
-          amrArtifactUpgradeHomeMock
-            ? undefined
-            : setAmrArtifactUpgradeHomeOffer
-        }
-      />
       <AnimatePresence>
       {settingsOpen ? (
         <SettingsDialog
@@ -2688,13 +2577,11 @@ function AppInner() {
           agents={agents}
           agentsLoading={agentsLoading}
           daemonLive={daemonLive}
-          appVersionInfo={appVersionInfo}
           welcome={settingsWelcome}
           initialSection={settingsInitialSection}
           initialHighlight={settingsHighlight}
           composioConfigLoading={composioConfigLoading}
           onPersist={handleConfigPersist}
-          onSilentUpdatePreferenceChange={handleSilentUpdatePreferenceChange}
           onDraftChange={handleSettingsDraftChange}
           onPersistComposioKey={handleConfigPersistComposioKey}
           onPersistByokCredential={persistByokCredentialProfileToDaemon}
@@ -2761,35 +2648,6 @@ function AppInner() {
           onDismiss={() => setLegacyByokMigrationError(null)}
         />
       ) : null}
-      {/* First-run privacy consent banner. It waits for daemon config
-          hydration because privacyDecisionAt is daemon-owned and stripped
-          from localStorage. It waits for `onboardingCompleted` so first-run
-          users see the welcome panel before the disclosure (Skip and
-          finish both flip the flag). Independent of Settings: z-index in
-          index.css sits above modal backdrops so opening Settings does
-          not hide the banner. */}
-      <AnimatePresence>
-      {showPrivacyConsent ? (
-        <motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 10, scale: 0.97 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-        >
-        <PrivacyConsentModal
-          onShare={() => {
-            // The banner owns only the privacy decision; it does not drive
-            // navigation. Choosing Share keeps the current anonymous identity
-            // when one already exists and enables the telemetry surface.
-            handlePrivacyConsentChoice(true);
-          }}
-          onDecline={() => {
-            handlePrivacyConsentChoice(false);
-          }}
-        />
-      </motion.div>
-      ) : null}
-      </AnimatePresence>
     </>
   );
 }
