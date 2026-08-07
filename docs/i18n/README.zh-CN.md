@@ -370,23 +370,6 @@ chmod +x Open-Design-*.AppImage
 ./Open-Design-*.AppImage          # 桌面环境直接启动
 ```
 
-服务器 / 无图形界面环境也可使用 headless 模式（仅 daemon + web，无 Electron 桌面壳）。注意：headless 模式依赖源码目录，不可脱离仓库迁移。支持通过环境变量绑定外部网络和固定端口：
-
-```bash
-# 启动（默认绑定 127.0.0.1，动态端口）
-pnpm tools-pack linux install --headless
-pnpm tools-pack linux start --headless
-
-# 绑定所有网络接口 + 固定端口
-OD_HOST=0.0.0.0 OD_PORT=17456 OD_WEB_PORT=17573 pnpm tools-pack linux start --headless
-
-# 查看状态与日志
-pnpm tools-pack linux inspect --headless     # 查看状态
-pnpm tools-pack linux logs --json            # 查看日志
-pnpm tools-pack linux stop --headless
-pnpm tools-pack linux cleanup --headless
-```
-
 ### 一个完整的工作流——从需求到工件
 
 `需求 → 插件 → 方向 → 设计系统 → 工件 → 交付 → 记忆`
