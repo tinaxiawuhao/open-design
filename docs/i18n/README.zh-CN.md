@@ -341,7 +341,8 @@ pnpm tools-dev stop
 pnpm tools-dev run web --daemon-port 17456 --web-port 17573
 # 用 OD_HOST=0.0.0.0 绑定所有网络接口
 # 带上 API Key 重启
-nohup env COSMO_API_KEY="sk-" OD_HOST=0.0.0.0  pnpm tools-dev run web --daemon-port 17456 --web-port 17573 > ~/open-design.log 2>&1 &
+tmux new -d -s od 'env COSMO_API_KEY="sk-" OD_HOST=0.0.0.0 pnpm tools-dev run web --daemon-port 17456 --web-port 17573 2>&1 | tee ~/open-design.log'
+nohup env COSMO_API_KEY="sk-" OD_HOST=0.0.0.0  pnpm tools-dev run web --daemon-port 17456 --web-port 17573 </dev/null >~/open-design.log 2>&1 & disown
 # 持久化建议加到 ~/.bashrc：
 echo 'export COSMO_API_KEY="sk-"' >> ~/.bashrc
 ```
