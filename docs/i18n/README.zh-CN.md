@@ -341,7 +341,7 @@ pnpm tools-dev stop
 pnpm tools-dev run web --daemon-port 17456 --web-port 17573
 # 用 OD_BIND_HOST=0.0.0.0 绑定所有网络接口
 # 带上 API Key 重启
-nohup env COSMO_API_KEY="sk-" OD_BIND_HOST=0.0.0.0  pnpm tools-dev run web --daemon-port 17456 --web-port 17573 </dev/null >~/open-design.log 2>&1 & disown
+nohup env COSMO_API_KEY="sk-" OD_HOST=0.0.0.0 OD_BIND_HOST=0.0.0.0  pnpm tools-dev run web --daemon-port 17456 --web-port 17573 </dev/null >~/open-design.log 2>&1 & disown
 # 持久化建议加到 ~/.bashrc：
 echo 'export COSMO_API_KEY="sk-"' >> ~/.bashrc
 
@@ -355,7 +355,7 @@ ss -tlnp | grep 17456        # 应无输出
 # 3) 用正确变量重启（OD_BIND_HOST + OD_API_TOKEN，跨机访问必须带 token）
 TOKEN=$(openssl rand -hex 32)
 echo "OD_API_TOKEN = $TOKEN"   # 记下来，MateClaw 要填一样的
-tmux new -d -s od "env COSMO_API_KEY='sk-你的key' OD_BIND_HOST=0.0.0.0 OD_API_TOKEN='$TOKEN' pnpm tools-dev run web --daemon-port 17456 --web-port 17573 2>&1 | tee ~/open-design.log"
+tmux new -d -s od "env COSMO_API_KEY='sk-你的key' OD_HOST=0.0.0.0  OD_BIND_HOST=0.0.0.0 OD_API_TOKEN='$TOKEN' pnpm tools-dev run web --daemon-port 17456 --web-port 17573 2>&1 | tee ~/open-design.log"
 ```
 
 打开 `tools-dev` 打印的 URL；除非显式传入端口参数，开发端口会动态分配。
