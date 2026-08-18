@@ -530,6 +530,8 @@ export const uk: Dict = {
   'settings.cliEnvClaudeApiKey': 'API key Claude CLI',
   'settings.cliEnvCodexHome': 'Домашній каталог Codex',
   'settings.cliEnvCodexBin': 'Шлях до виконуваного файлу Codex',
+'settings.cliEnvDshHome': 'Домашній каталог DeepSeek Harness (DSH_HOME)',
+'settings.cliEnvDshBin': 'Шлях до виконуваного файлу DeepSeek Harness',
   'settings.cliEnvCodexBaseUrl': 'Base URL проксі Codex/OpenAI',
   'settings.cliEnvCodexApiKey': 'API key Codex/OpenAI CLI',
   'settings.modelCustom': 'Власна (введіть нижче)…',

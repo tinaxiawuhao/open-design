@@ -530,6 +530,8 @@ export const ja: Dict = {
   'settings.cliEnvClaudeApiKey': 'Claude CLI API key',
   'settings.cliEnvCodexHome': 'Codex ホーム',
   'settings.cliEnvCodexBin': 'Codex 実行ファイルのパス',
+'settings.cliEnvDshHome': 'DeepSeek Harness ホーム (DSH_HOME)',
+'settings.cliEnvDshBin': 'DeepSeek Harness 実行ファイルのパス',
   'settings.cliEnvCodexBaseUrl': 'Codex/OpenAI プロキシの Base URL',
   'settings.cliEnvCodexApiKey': 'Codex/OpenAI CLI API key',
   'settings.modelCustom': 'カスタム（下に入力）…',

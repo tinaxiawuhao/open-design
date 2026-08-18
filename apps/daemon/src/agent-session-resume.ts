@@ -307,6 +307,9 @@ export function isAgentResumeFailure(
   stderr: string,
   stdout = '',
 ): boolean {
+  if (agentId === 'deepseek-harness') {
+    return /DSH_PROFILE_RESUME_(?:REJECTED|MISMATCH)/.test(`${stderr}\n${stdout}`);
+  }
   if (agentId === 'codex') return isCodexResumeFailure(stderr);
   if (agentId === 'opencode') return isOpencodeResumeFailure(stderr);
   if (agentId === 'amr') {

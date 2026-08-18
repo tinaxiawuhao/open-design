@@ -530,6 +530,8 @@ export const esES: Dict = {
   'settings.cliEnvClaudeApiKey': 'API key de Claude CLI',
   'settings.cliEnvCodexHome': 'Directorio principal de Codex',
   'settings.cliEnvCodexBin': 'Ruta del ejecutable de Codex',
+'settings.cliEnvDshHome': 'Directorio de DeepSeek Harness (DSH_HOME)',
+'settings.cliEnvDshBin': 'Ruta del ejecutable de DeepSeek Harness',
   'settings.cliEnvCodexBaseUrl': 'Base URL del proxy de Codex/OpenAI',
   'settings.cliEnvCodexApiKey': 'API key de Codex/OpenAI CLI',
   'settings.modelCustom': 'Personalizado (escribe abajo)…',

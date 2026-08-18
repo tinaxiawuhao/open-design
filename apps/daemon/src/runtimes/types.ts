@@ -15,6 +15,10 @@ export type RuntimeModelOption = {
   metadata?: ModelMetadata;
   additionalSpeedTiers?: string[];
   serviceTierOptions?: RuntimeModelOption[];
+  // Per-model reasoning-effort catalog, surfaced by the Settings model
+  // picker and forwarded to runtimes that accept a reasoning-effort id
+  // (deepseek-harness profile models, codebuddy, codex, grok-build, pi).
+  reasoningOptions?: RuntimeModelOption[];
 };
 
 export type RuntimeModelSource = 'live' | 'fallback';
@@ -241,7 +245,12 @@ export type RuntimeAgentDef = {
   // actively probed for auth — their auth status is only inferred later
   // from a real chat failure's error text (see classifyAgentServiceFailure).
   authProbe?: {
-    args: string[];
+    // When present, detection spawns `<bin> <args>` after the version check
+    // and classifies the combined stdout/stderr to derive `authStatus`.
+    // Omit `args` for a credential-file/env-only probe (see `envKeys` /
+    // `authFile`) that never spawns the CLI — for adapters whose CLI has no
+    // reliable non-interactive auth status command (OpenCode).
+    args?: string[];
     timeoutMs?: number;
     // Agent id whose tailored auth classifier + API-key short-circuit should
     // be used for this probe when it differs from the runtime agent id. Local
@@ -250,6 +259,17 @@ export type RuntimeAgentDef = {
     // auth semantics (e.g. Claude's JSON-aware parser) instead of falling
     // through to the generic classifier. Defaults to the def id when unset.
     classifierAgentId?: string;
+    // Credential-file/env-only probe (consulted only when `args` is omitted):
+    // any of `envKeys` holding a non-empty value ⇒ authenticated via
+    // environment; `authFile` with at least one non-empty provider record ⇒
+    // authenticated via credentials file. `authFile: 'opencode'` resolves to
+    // OpenCode's XDG auth.json (`$XDG_DATA_HOME/opencode/auth.json` or
+    // `~/.local/share/opencode/auth.json`); any other value is treated as an
+    // absolute file path. Mirrors claudecodeui's OpenCode credential check,
+    // which deliberately avoids OpenCode's unreliable non-interactive auth
+    // command.
+    envKeys?: string[];
+    authFile?: string;
   };
   // Format for the `env` field in ACP `session/new` → `mcpServers[].env`.
   // `'array'` (default) emits `[{name, value}]` — used by Hermes, Kimi,

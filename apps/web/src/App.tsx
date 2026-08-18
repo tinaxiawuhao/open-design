@@ -341,6 +341,7 @@ const CANONICAL_AGENT_ORDER = [
   'kilo',
   'vibe',
   'deepseek',
+  'deepseek-harness',
   'aider',
   'antigravity',
   'reasonix',

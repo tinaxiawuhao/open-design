@@ -530,6 +530,8 @@ export const ar: Dict = {
   'settings.cliEnvClaudeApiKey': 'مفتاح API لـ Claude CLI',
   'settings.cliEnvCodexHome': 'مجلد Codex الرئيسي',
   'settings.cliEnvCodexBin': 'مسار ملف Codex التنفيذي',
+'settings.cliEnvDshHome': 'دليل DeepSeek Harness (DSH_HOME)',
+'settings.cliEnvDshBin': 'مسار تنفيذ DeepSeek Harness',
   'settings.cliEnvCodexBaseUrl': 'Base URL لوكيل Codex/OpenAI',
   'settings.cliEnvCodexApiKey': 'مفتاح API لـ Codex/OpenAI CLI',
   'settings.modelCustom': 'مخصص (اكتب أدناه)...',

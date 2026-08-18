@@ -530,6 +530,8 @@ export const ptBR: Dict = {
   'settings.cliEnvClaudeApiKey': 'API key da Claude CLI',
   'settings.cliEnvCodexHome': 'Home do Codex',
   'settings.cliEnvCodexBin': 'Caminho do executável do Codex',
+'settings.cliEnvDshHome': 'Diretorio do DeepSeek Harness (DSH_HOME)',
+'settings.cliEnvDshBin': 'Caminho do executavel do DeepSeek Harness',
   'settings.cliEnvCodexBaseUrl': 'Base URL do proxy Codex/OpenAI',
   'settings.cliEnvCodexApiKey': 'API key da Codex/OpenAI CLI',
   'settings.modelCustom': 'Personalizado (digite abaixo)…',

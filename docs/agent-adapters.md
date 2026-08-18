@@ -60,7 +60,18 @@ type RuntimeAgentDef = {
   // Optional capability / integration declarations (all data, no behavior).
   supportsImagePaths?: boolean;
   externalMcpInjection?: 'claude-mcp-json' | 'acp-merge' | 'opencode-env-content';
-  authProbe?: { args: string[]; timeoutMs?: number };
+  authProbe?: {
+    // When present, detection spawns `<bin> <args>` and classifies the
+    // combined stdout/stderr. Omit `args` for a credential-file/env-only
+    // probe (see `envKeys` / `authFile`) that never spawns the CLI — used by
+    // adapters whose CLI has no reliable non-interactive auth status command
+    // (OpenCode; mirrors claudecodeui's credential check).
+    args?: string[];
+    timeoutMs?: number;
+    classifierAgentId?: string;
+    envKeys?: string[];
+    authFile?: string;
+  };
   listModels?: RuntimeListModels;     // dynamic model discovery
   // …~30 more optional fields, every one data or a pure arg-builder.
 };
@@ -124,6 +135,10 @@ For each definition, detection:
 3. After availability is established, runs help/capability, model-discovery,
    and declared auth probes concurrently. Definitions without `authProbe` are
    not assigned a synthetic auth failure from a config-directory guess.
+   Credential-file/env-only probes (no `args`) do not spawn the CLI: they
+   check provider API-key env vars (`envKeys`) and the adapter's own
+   credentials file (`authFile`, e.g. OpenCode's `auth.json` written by
+   `opencode auth login`) instead.
 
 Each adapter probe is fault-isolated so one broken executable cannot empty the
 whole picker. Capability flags and recently discovered live models are retained

@@ -530,6 +530,8 @@ export const th: Dict = {
   'settings.cliEnvClaudeApiKey': 'Claude CLI API key',
   'settings.cliEnvCodexHome': 'โฮมของ Codex',
   'settings.cliEnvCodexBin': 'เส้นทางไฟล์เรียกทำงาน Codex',
+'settings.cliEnvDshHome': 'โฟลเดอร์ DeepSeek Harness (DSH_HOME)',
+'settings.cliEnvDshBin': 'เส้นทางไฟล์ปฏิบัติการ DeepSeek Harness',
   'settings.cliEnvCodexBaseUrl': 'Base URL พร็อกซีของ Codex/OpenAI',
   'settings.cliEnvCodexApiKey': 'Codex/OpenAI CLI API key',
   'settings.modelCustom': 'กำหนดเอง (พิมพ์ด้านล่าง)…',

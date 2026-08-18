@@ -542,6 +542,8 @@ export const zhCN: Dict = {
   "settings.cliEnvClaudeApiKey": "Claude CLI API key",
   "settings.cliEnvCodexHome": "Codex home",
   "settings.cliEnvCodexBin": "Codex 可执行文件路径",
+"settings.cliEnvDshHome": "DeepSeek Harness 数据目录 (DSH_HOME)",
+"settings.cliEnvDshBin": "DeepSeek Harness 可执行文件路径",
   "settings.cliEnvCodexBaseUrl": "Codex/OpenAI proxy base URL",
   "settings.cliEnvCodexApiKey": "Codex/OpenAI CLI API key",
   "settings.modelCustom": "自定义（在下方填写）…",

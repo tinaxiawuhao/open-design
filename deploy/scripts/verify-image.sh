@@ -32,7 +32,8 @@ for required_path in \
   "app/apps/daemon/node_modules/better-sqlite3" \
   "app/skills" \
   "app/design-systems" \
-  "app/assets/frames"
+  "app/assets/frames" \
+  "usr/local/bin/opencode"
 do
   if ! grep -Eq "^${required_path}(/|$)" <<<"$archive_listing"; then
     echo "missing expected runtime path: $required_path" >&2
@@ -70,6 +71,14 @@ if [[ "$node_major" != "24" ]]; then
   echo "unexpected runtime node major: $node_major" >&2
   exit 1
 fi
+
+opencode_version="$(docker run --rm --entrypoint opencode "$IMAGE_REF" --version 2>/dev/null || true)"
+if [[ -z "$opencode_version" ]]; then
+  echo "bundled opencode CLI missing or failing to run:" >&2
+  docker run --rm --entrypoint opencode "$IMAGE_REF" --version >&2 || true
+  exit 1
+fi
+echo "bundled opencode version: ${opencode_version}"
 
 CONTAINER_ID="$(docker run -d -p 127.0.0.1::7456 "$IMAGE_REF")"
 runtime_port="$(docker port "$CONTAINER_ID" 7456/tcp | awk -F: '{print $2}')"

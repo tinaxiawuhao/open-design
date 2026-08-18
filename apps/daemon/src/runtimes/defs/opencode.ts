@@ -11,6 +11,25 @@ export const opencodeAgentDef = {
     bin: 'opencode-cli',
     fallbackBins: ['opencode'],
     versionArgs: ['--version'],
+    // OpenCode has no reliable non-interactive auth status command, so this
+    // probe is credential-file/env-only and never spawns the CLI — it mirrors
+    // claudecodeui's opencode-auth provider, which reads
+    // `~/.local/share/opencode/auth.json` (written by `opencode auth login`)
+    // and falls back to provider API-key env vars inherited by the spawned
+    // CLI. The env-key list mirrors claudecodeui's OPENCODE_ENV_CREDENTIAL_KEYS
+    // plus the keys this fork's users actually set (DeepSeek / xAI).
+    authProbe: {
+      envKeys: [
+        'ANTHROPIC_API_KEY',
+        'OPENAI_API_KEY',
+        'GOOGLE_GENERATIVE_AI_API_KEY',
+        'GROQ_API_KEY',
+        'OPENROUTER_API_KEY',
+        'DEEPSEEK_API_KEY',
+        'XAI_API_KEY',
+      ],
+      authFile: 'opencode',
+    },
     ...OPENCODE_PERMISSION_CAPABILITY,
     // `opencode models` prints `provider/model` per line. Real-world
     // `opencode models` calls can take >8s (network round-trip to the

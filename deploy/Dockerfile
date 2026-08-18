@@ -18,7 +18,7 @@ ENV no_proxy=${no_proxy}
 ENV NO_PROXY=${NO_PROXY}
 ENV CI=true
 
-RUN apk add --no-cache python3 make g++
+RUN apk add --no-cache python3 make g++ curl
 
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -78,6 +78,28 @@ COPY prompt-templates ./prompt-templates
 COPY assets ./assets
 COPY plugins/_official ./plugins/_official
 
+# Bundled OpenCode agent CLI — pinned release, musl build for Alpine.
+# The tarball contains a single `opencode` binary at its root. It lands on
+# PATH in the runtime stage (`/usr/local/bin/opencode`), where the daemon's
+# runtime detection picks it up automatically (`opencode` + `byok-opencode`
+# defs both resolve it; see apps/daemon/src/runtimes/executables.ts).
+# Rebuild with `--build-arg OPENCODE_VERSION=vX.Y.Z` to pin another tag.
+ARG OPENCODE_VERSION=v1.18.18
+RUN arch="$(uname -m)"; \
+    case "$arch" in \
+      x86_64|amd64) arch="x64" ;; \
+      aarch64|arm64) arch="arm64" ;; \
+      *) echo "unsupported opencode arch: $arch" >&2; exit 1 ;; \
+    esac; \
+    mkdir -p /app/opencode-dist && \
+    curl -fsSL --retry 5 --connect-timeout 30 --max-time 300 \
+      "https://github.com/anomalyco/opencode/releases/download/${OPENCODE_VERSION}/opencode-linux-${arch}-musl.tar.gz" \
+      -o /tmp/opencode.tar.gz && \
+    tar -xzf /tmp/opencode.tar.gz -C /app/opencode-dist && \
+    chmod 755 /app/opencode-dist/opencode && \
+    rm -f /tmp/opencode.tar.gz && \
+    /app/opencode-dist/opencode --version
+
 FROM ${RUNTIME_IMAGE}
 
 RUN apk add --no-cache tini poppler-utils bash git && \
@@ -99,14 +121,28 @@ COPY --from=build --chown=open-design:open-design /app/assets/community-pets ./a
 # it on startup so the container ships with first-party atoms reachable
 # via the same registry path third-party plugins use.
 COPY --from=build --chown=open-design:open-design /app/plugins/_official ./plugins/_official
+# Bundled OpenCode agent CLI (musl build for Alpine). The daemon auto-detects
+# `opencode` on PATH at startup — no daemon-side configuration is needed.
+# Override the pinned tag at build time: --build-arg OPENCODE_VERSION=vX.Y.Z
+COPY --from=build /app/opencode-dist/opencode /usr/local/bin/opencode
 
-RUN mkdir -p /app/.od && \
-    chown -R open-design:open-design /app
+RUN mkdir -p /app/.od /home/open-design && \
+    chown -R open-design:open-design /app /home/open-design
 
 ENV NODE_ENV=production
 ENV NODE_OPTIONS=--max-old-space-size=192
 ENV OD_BIND_HOST=0.0.0.0
 ENV OD_PORT=7456
+# Agent CLI (opencode) home. /home/open-design is the container home (the
+# Linux compose override mounts a tmpfs + credential mounts there).
+ENV HOME=/home/open-design
+# opencode data/config/cache live under the daemon data volume (/app/.od):
+# the compose rootfs is read-only, so only the volume and /tmp are writable
+# at runtime. The daemon mirrors this XDG_DATA_HOME for its opencode log
+# diagnostics (apps/daemon/src/runtimes/opencode-log.ts).
+ENV XDG_DATA_HOME=/app/.od/.local/share
+ENV XDG_CONFIG_HOME=/app/.od/.config
+ENV XDG_CACHE_HOME=/app/.od/.cache
 
 EXPOSE 7456
 

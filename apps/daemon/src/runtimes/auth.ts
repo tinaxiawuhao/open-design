@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { execAgentFile } from './invocation.js';
 import { readCodexProviderEnvKey } from '../codex-config-normalize.js';
 import type { RuntimeAgentDef, RuntimeEnv } from './types.js';
@@ -22,6 +24,9 @@ const CURSOR_AUTH_GUIDANCE =
 
 const DEEPSEEK_AUTH_GUIDANCE =
   'DeepSeek TUI is installed but is not authenticated. Add or verify your API key in `~/.deepseek/config.toml` as `api_key = "..."`, or expose DEEPSEEK_API_KEY to the Open Design daemon process, then retry. If Open Design is launched outside an interactive shell, shell rc files such as ~/.zshrc may not be loaded.';
+
+const DEEPSEEK_HARNESS_AUTH_GUIDANCE =
+  'DeepSeek Harness has no model API key configured. Open a terminal and run `dsh web`, then open Settings → Models and add your DeepSeek API key. Return to Open Design and retry. For automation, expose DEEPSEEK_API_KEY to the Open Design process.';
 
 // agy's print mode (`-p`) detects a missing OAuth token, prints the
 // Google sign-in URL to stdout, waits 30s for completion, then exits
@@ -56,12 +61,22 @@ const REASONIX_AUTH_GUIDANCE =
 const CLAUDE_AUTH_GUIDANCE =
   'Claude Code is installed but is not authenticated. Run `claude auth login` or open `claude` and complete login in a terminal, then rescan. If Open Design was launched outside an interactive shell, your shell rc files (e.g. ~/.zshrc) may not be loaded into its environment.';
 
+// Mirrors claudecodeui's OpenCode auth guidance: OpenCode authenticates via
+// `opencode auth login` (writing ~/.local/share/opencode/auth.json) or via
+// provider API-key env vars inherited by the spawned CLI.
+const OPENCODE_AUTH_GUIDANCE =
+  'OpenCode is installed but has no credentials. Log in with `opencode auth login` in a terminal, or expose a provider API key to the Open Design process environment (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, GROQ_API_KEY, OPENROUTER_API_KEY, DEEPSEEK_API_KEY, XAI_API_KEY), then rescan.';
+
 export function cursorAuthGuidance(): string {
   return CURSOR_AUTH_GUIDANCE;
 }
 
 export function deepseekAuthGuidance(): string {
   return DEEPSEEK_AUTH_GUIDANCE;
+}
+
+export function deepseekHarnessAuthGuidance(): string {
+  return DEEPSEEK_HARNESS_AUTH_GUIDANCE;
 }
 
 export function antigravityAuthGuidance(): string {
@@ -78,6 +93,10 @@ export function reasonixAuthGuidance(): string {
 
 export function claudeAuthGuidance(): string {
   return CLAUDE_AUTH_GUIDANCE;
+}
+
+export function opencodeAuthGuidance(): string {
+  return OPENCODE_AUTH_GUIDANCE;
 }
 
 export function isCursorAuthFailureText(text: string): boolean {
@@ -118,12 +137,63 @@ export function isDeepSeekAuthFailureText(text: string): boolean {
   const value = String(text || '');
   if (!value.trim()) return false;
   return (
+    /\b(?:MISSING_CREDENTIAL|DSH_PROVIDER_AUTH_FAILED)\b/i.test(value) ||
     /KEY=<your-key>/i.test(value) ||
     /api_key\s*=\s*["']<your-key>["']/i.test(value) ||
     (/~\/\.deepseek\/config\.toml/i.test(value) && /api[_ -]?key|KEY=/i.test(value)) ||
     (/DEEPSEEK_API_KEY/i.test(value) &&
       /auth|api[_ -]?key|missing|not set|required|unauthorized/i.test(value))
   );
+}
+
+type UnknownRecord = Record<string, unknown>;
+
+function unknownRecord(value: unknown): UnknownRecord | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  return value as UnknownRecord;
+}
+
+function firstNonEmptyString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+export type DeepSeekHarnessFailure = {
+  code: string;
+  message: string;
+  authRequired: boolean;
+};
+
+/**
+ * Turns the profile's structured error payload into a safe user-facing error.
+ * Harness SDK errors can place an object in `message`; never coerce that object
+ * to text because it produces `[object Object]` and can expose provider data.
+ */
+export function normalizeDeepSeekHarnessFailure(payload: unknown): DeepSeekHarnessFailure {
+  const root = unknownRecord(payload);
+  const nestedError = unknownRecord(root?.error);
+  const embeddedMessage = unknownRecord(root?.message);
+  const code = firstNonEmptyString(
+    nestedError?.code,
+    root?.code,
+    embeddedMessage?.code,
+  ) ?? 'AGENT_EXECUTION_FAILED';
+  const rawMessage = firstNonEmptyString(
+    typeof payload === 'string' ? payload : undefined,
+    root?.message,
+    nestedError?.message,
+    embeddedMessage?.message,
+  );
+  const authRequired = isDeepSeekAuthFailureText(`${code}\n${rawMessage ?? ''}`);
+  return {
+    code,
+    message: authRequired
+      ? deepseekHarnessAuthGuidance()
+      : rawMessage ?? 'DeepSeek Harness profile error.',
+    authRequired,
+  };
 }
 
 export function isReasonixAuthFailureText(text: string): boolean {
@@ -184,6 +254,13 @@ export function classifyAgentAuthFailure(
     return {
       status: 'missing',
       message: deepseekAuthGuidance(),
+    };
+  }
+  if (agentId === 'deepseek-harness') {
+    if (!isDeepSeekAuthFailureText(text)) return null;
+    return {
+      status: 'missing',
+      message: deepseekHarnessAuthGuidance(),
     };
   }
   if (agentId === 'antigravity') {
@@ -309,6 +386,7 @@ const TAILORED_AUTH_AGENTS = new Set([
   'claude',
   'cursor-agent',
   'deepseek',
+  'deepseek-harness',
   'antigravity',
   'reasonix',
 ]);
@@ -318,6 +396,49 @@ function hasNonEmptyEnv(env: RuntimeEnv, keys: string[]): boolean {
     const value = env[key];
     return typeof value === 'string' && value.trim().length > 0;
   });
+}
+
+// OpenCode resolves its data dir as `$XDG_DATA_HOME/opencode` (when set) or
+// `$HOME/.local/share/opencode` — the same convention opencode-log.ts
+// mirrors — with `USERPROFILE` as the Windows fallback when HOME is unset.
+// `auth.json` is written there by `opencode auth login` and maps provider ids
+// to provider auth records (e.g. `{"cosmo": {"type": "api", "key": "…"}}`).
+export function resolveOpenCodeAuthFile(env: RuntimeEnv): string | null {
+  const xdg = typeof env.XDG_DATA_HOME === 'string' ? env.XDG_DATA_HOME.trim() : '';
+  const home = typeof env.HOME === 'string' ? env.HOME.trim() : '';
+  const userProfile =
+    typeof env.USERPROFILE === 'string' ? env.USERPROFILE.trim() : '';
+  const base = xdg
+    || (home ? path.join(home, '.local', 'share') : '')
+    || (userProfile ? path.join(userProfile, '.local', 'share') : '');
+  if (!base) return null;
+  return path.join(base, 'opencode', 'auth.json');
+}
+
+// Mirror claudecodeui's OpenCode credential check: a provider record counts
+// as a credential when it holds at least one non-empty value (a string or a
+// nested object). Returns false on any read/parse error (no file yet, JSON
+// not an object, perms).
+export function hasOpenCodeAuthFileCredentials(filePath: string): boolean {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(filePath, 'utf8'));
+  } catch {
+    return false;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return false;
+  }
+  for (const value of Object.values(parsed as Record<string, unknown>)) {
+    if (!value || typeof value !== 'object') continue;
+    const hasCredential = Object.values(value as Record<string, unknown>).some(
+      (entry) =>
+        (typeof entry === 'string' && entry.trim().length > 0)
+        || (typeof entry === 'object' && entry !== null),
+    );
+    if (hasCredential) return true;
+  }
+  return false;
 }
 
 function hasProbeSatisfyingApiKey(agentId: string, env: RuntimeEnv): boolean {
@@ -377,6 +498,29 @@ export async function probeAgentAuthStatus(
     if (providerEnvKey && hasNonEmptyEnv(env, [providerEnvKey])) {
       return { status: 'ok' };
     }
+  }
+  // Credential-file/env-only probe: no CLI to spawn. OpenCode has no reliable
+  // non-interactive auth status command, so — mirroring claudecodeui's
+  // opencode-auth provider — the probe reads OpenCode's own auth.json
+  // (written by `opencode auth login`) and falls back to provider API-key
+  // env vars instead of running a command.
+  if (!probe.args) {
+    const envKey = (probe.envKeys ?? []).find((key) => hasNonEmptyEnv(env, [key]));
+    if (envKey) {
+      return {
+        status: 'ok',
+        message: `${def.name || def.id} is authenticated via environment variable ${envKey}.`,
+      };
+    }
+    const authFilePath =
+      probe.authFile === 'opencode' ? resolveOpenCodeAuthFile(env) : probe.authFile;
+    if (authFilePath && hasOpenCodeAuthFileCredentials(authFilePath)) {
+      return {
+        status: 'ok',
+        message: `${def.name || def.id} is authenticated via OpenCode credentials file (${authFilePath}).`,
+      };
+    }
+    return { status: 'missing', message: opencodeAuthGuidance() };
   }
   try {
     const { stdout, stderr } = await execAgentFile(resolvedBin, probe.args, {

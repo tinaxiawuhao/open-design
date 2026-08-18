@@ -723,6 +723,18 @@ const AGENT_CLI_ENV_FIELDS = [
     placeholder: 'Paste OPENAI_API_KEY',
     secret: true,
   },
+  {
+    agentId: 'deepseek-harness',
+    envKey: 'DSH_HOME',
+    labelKey: 'settings.cliEnvDshHome',
+    placeholder: '~/.dsh',
+  },
+  {
+    agentId: 'deepseek-harness',
+    envKey: 'DSH_BIN',
+    labelKey: 'settings.cliEnvDshBin',
+    placeholder: '/absolute/path/to/dsh',
+  },
 ] as const;
 
 function defaultApiProtocolConfig(protocol: ApiProtocol): ApiProtocolConfig {

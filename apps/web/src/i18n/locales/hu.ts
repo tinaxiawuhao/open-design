@@ -530,6 +530,8 @@ export const hu: Dict = {
   'settings.cliEnvClaudeApiKey': 'Claude CLI API-kulcs',
   'settings.cliEnvCodexHome': 'Codex könyvtár',
   'settings.cliEnvCodexBin': 'Codex futtatható fájl elérési útja',
+'settings.cliEnvDshHome': 'DeepSeek Harness adatkonyvtar (DSH_HOME)',
+'settings.cliEnvDshBin': 'DeepSeek Harness futtathato fajl eleresi utja',
   'settings.cliEnvCodexBaseUrl': 'Codex/OpenAI proxy Base URL',
   'settings.cliEnvCodexApiKey': 'Codex/OpenAI CLI API-kulcs',
   'settings.modelCustom': 'Egyedi (gépeld be alább)…',

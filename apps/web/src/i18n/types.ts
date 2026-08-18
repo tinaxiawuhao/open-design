@@ -479,6 +479,8 @@ export interface Dict {
   'settings.cliEnvClaudeApiKey': string;
   'settings.cliEnvCodexHome': string;
   'settings.cliEnvCodexBin': string;
+  'settings.cliEnvDshHome': string;
+  'settings.cliEnvDshBin': string;
   'settings.cliEnvCodexBaseUrl': string;
   'settings.cliEnvCodexApiKey': string;
   'settings.modelCustom': string;

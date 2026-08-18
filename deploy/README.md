@@ -80,16 +80,46 @@ Pin a specific published image with a digest instead of the mutable `latest` tag
 ```bash
 OPEN_DESIGN_IMAGE=ghcr.io/nexu-io/od@sha256:<digest> docker compose up -d --no-build
 ```
-The image intentionally does not bundle Claude/Codex/Gemini CLI binaries. Keep
-those outside the image, or build a separate private runtime layer if a server
-deployment needs local code-agent CLIs installed in the container.
+
+## Bundled agent CLI: OpenCode
+
+The image bundles the **OpenCode** CLI (`/usr/local/bin/opencode`, pinned
+musl build for Alpine) so the OpenCode agent works directly in the container —
+no host mounting or extra setup. The daemon auto-detects `opencode` on `PATH`
+at startup, so **Settings → Execution mode** should show OpenCode as installed,
+and it can be selected as the agent for runs.
+
+```bash
+docker exec open-design opencode --version
+# or one-shot:
+docker run --rm --entrypoint opencode ghcr.io/nexu-io/od:latest --version
+```
+
+Notes:
+
+- **Version pinning / upgrades.** The image is built with
+  `--build-arg OPENCODE_VERSION=v1.18.18` (the default). Rebuild with a newer
+  tag to upgrade, e.g. `docker build -f deploy/Dockerfile --build-arg OPENCODE_VERSION=v1.19.0 .`
+- **State and auth.** opencode writes its config/auth/session data under the
+  daemon data volume via the image's `XDG_DATA_HOME` / `XDG_CONFIG_HOME` /
+  `XDG_CACHE_HOME` env (`/app/.od/...`), so it persists across container
+  recreates with the `open_design_data` volume. Pass provider keys through
+  compose environment (e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or whatever
+  provider opencode is configured for), or mount your own `opencode.json`
+  config.
+- **Other agent CLIs** (Claude Code, Codex, Gemini, …) are still **not**
+  bundled. Keep them outside the image, or build a separate private runtime
+  layer if a server deployment needs them installed in the container.
 
 ## Linux: mounting host agent CLIs
 
-On Linux you can mount host-installed agent CLIs (Claude Code, opencode, Codex,
-…) into the container without rebuilding the image. The override file
+On Linux you can mount host-installed agent CLIs (Claude Code, Codex, …) into
+the container without rebuilding the image. The override file
 `docker-compose.linux.yml` is already loaded automatically by `install.sh` on
-Linux; it switches to `network_mode: host` and adds the CLI mounts.
+Linux; it switches to `network_mode: host` and adds the CLI mounts. OpenCode is
+now bundled in the image, so the host opencode mount is only needed if you want
+a specific local version to override the bundled one (the override `PATH`
+prepends host mounts, so the host CLI wins).
 
 **1. Build the local image** (adds `libc6-compat` so glibc-linked CLIs run on Alpine):
 
@@ -114,7 +144,7 @@ Common install paths:
 | CLI | Default path |
 |-----|-------------|
 | Claude Code | `~/.local/bin/claude` (symlink) + `~/.local/share/claude` (binaries) |
-| opencode | `~/.opencode/bin/opencode` |
+| opencode | `~/.opencode/bin/opencode` (optional — bundled in the image) |
 | Codex | `~/.local/bin/codex` |
 
 The daemon auto-detects any CLI that is visible in `PATH` at startup — no extra
