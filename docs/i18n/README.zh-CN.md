@@ -328,14 +328,69 @@ docker compose up -d
 > **镜像内置 OpenCode CLI。** 镜像捆绑了 OpenCode CLI（`/usr/local/bin/opencode`，针对 Alpine 构建的 musl 版本），开箱即用，无需在宿主机安装或挂载。daemon 启动时自动检测 `PATH` 上的 `opencode`，因此 **设置 → 执行模式** 中应显示 OpenCode 已安装，可直接选作运行 agent：
 >
 > ```bash
+> # 在已启动的 compose 容器内执行（服务名 open-design）：
 > docker exec open-design opencode --version
-> # 或一次性运行：
-> docker run --rm --entrypoint opencode ghcr.io/nexu-io/od:latest --version
+>
+> # 或一次性运行（无需已启动的容器），把 IMAGE 换成你的镜像仓库：
+> IMAGE=registry.cn-shanghai.aliyuncs.com/tianxiawuhao/open-design-opencode:latest
+> docker run --rm --entrypoint opencode "$IMAGE" --version
 > ```
 >
 > - **版本固定 / 升级**：镜像默认以 `--build-arg OPENCODE_VERSION=v1.18.18` 构建；用更新的 tag 重新构建即可升级，例如 `docker build -f deploy/Dockerfile --build-arg OPENCODE_VERSION=v1.19.0 .`
-> - **状态与鉴权**：opencode 的配置 / 认证 / 会话数据通过镜像内的 `XDG_DATA_HOME` / `XDG_CONFIG_HOME` / `XDG_CACHE_HOME` 环境变量写入 daemon 数据卷（`/app/.od/...`），容器重建后依然保留（`open_design_data` 卷）。Provider 密钥通过 compose 环境变量传入（如 `ANTHROPIC_API_KEY`、`OPENAI_API_KEY` 等），或挂载你自己的 `opencode.json` 配置。
+> - **状态与鉴权**：opencode 的配置 / 认证 / 会话数据通过镜像内的 `XDG_DATA_HOME` / `XDG_CONFIG_HOME` / `XDG_CACHE_HOME` 环境变量写入 daemon 数据卷（`/app/.od/...`），容器重建后依然保留（`open_design_data` 卷）。Provider 密钥（`auth.json`）与 Provider/模型配置（`opencode.json`）以只读方式从 `deploy/opencode/` 挂载进容器 —— 改宿主机文件后 `docker compose restart` 即可生效。详见下文「服务器部署」。
 > - **其他 Agent CLI**（Claude Code、Codex、Gemini 等）仍未内置，需要时请保留在镜像外，或在私有运行时层另行安装。
+
+#### 服务器部署（Docker）
+
+**1. 配置 `deploy/.env`**（从 `.env.example` 复制）：
+
+```bash
+cd deploy
+cp .env.example .env
+openssl rand -hex 32   # 生成 OD_API_TOKEN
+```
+
+至少设置：
+
+- `OPEN_DESIGN_IMAGE` — 你的镜像（如 `registry.cn-shanghai.aliyuncs.com/tianxiawuhao/open-design-opencode:latest` 或 `ghcr.io/nexu-io/od:latest`）
+- `OD_API_TOKEN` — **必需**（镜像已预设 `OD_BIND_HOST=0.0.0.0`）
+- `OPEN_DESIGN_DISABLE_API_AUTH=1` — **通过 Docker 端口映射访问 UI 时必须设置**。daemon 只对 loopback 来源放行；Docker 的 NAT 会让浏览器请求的来源变成网桥网关，此时若设置了 token，浏览器所有 `/api/*` 请求都会 401，UI 显示空列表（如「尚未检测到任何代理」）。建议保留 `OD_API_TOKEN` 作为未来直接非 loopback 暴露时的安全底线。
+- `OPEN_DESIGN_PORT=17456` 和 `OPEN_DESIGN_WEB_PORT=17573` — 两个宿主机端口，都转发到容器内同一个监听端口（API + Web UI）
+- `OPEN_DESIGN_ALLOWED_ORIGINS=http://localhost:17456,http://127.0.0.1:17456,http://localhost:17573,http://127.0.0.1:17573`
+
+**2. 配置 OpenCode 密钥与模型** — 镜像已内置 OpenCode CLI（`/usr/local/bin/opencode`）。其 API 密钥与 Provider/模型配置从 `deploy/opencode/` 只读挂载进容器（已 git-ignore，不会提交）：
+
+- `deploy/opencode/auth.json` — Provider API Key，例如：
+  ```json
+  { "cosmo": { "type": "api", "key": "sk-..." }, "deepseek": { "type": "api", "key": "sk-..." } }
+  ```
+- `deploy/opencode/opencode.json` — 自定义 Provider/模型，例如卡奥斯（cosmo）OpenAI 兼容 Provider，`baseURL=https://gpt.cosmoplat.com/v1`，模型 `cosmo-mind-coder` / `cosmo-mind-turbo` / `cosmo-mind-vl`。
+
+**3. 启动**：
+
+```bash
+docker compose up -d
+# 打开 http://localhost:17456（或 http://localhost:17573）
+```
+
+**4. 验证**：
+
+```bash
+curl http://localhost:17456/api/health
+docker exec open-design opencode --version
+```
+
+Web UI → **设置 → 执行模式 → 重新扫描**，OpenCode 应显示为已安装且认证通过，cosmo 模型可选。
+
+**5. 随时更换配置** — 改宿主机文件后重启即可（无需重新构建镜像）：
+
+```bash
+vi deploy/opencode/auth.json
+vi deploy/opencode/opencode.json
+docker compose restart
+```
+
+> 源码运行示例中的 `OD_HOST`、`COSMO_API_KEY` 在容器内**均不使用**；Provider 密钥放在 `deploy/opencode/auth.json` 或 compose 的 `environment:` 块中。完整变量参考见 [`deploy/README.md`](../../deploy/README.md#server-deployment-environment)。
 
 ### 🚀 部署到 Sealos
 

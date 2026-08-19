@@ -56,7 +56,10 @@ services:
       - /lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:ro
       - /lib64:/lib64:ro
     tmpfs:
-      # uid/gid must match the base image's open-design user (1001:1001).
+      # Writable $HOME for the bundled opencode (Bun runtime) — now also
+      # provided by the base compose file; kept here for standalone use of
+      # this override. uid/gid must match the base image's open-design user
+      # (1001:1001).
       - /home/open-design:uid=1001,gid=1001
     healthcheck:
       # Use wget (available in Alpine) instead of node — faster and does not

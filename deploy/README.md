@@ -23,6 +23,7 @@ Before starting:
 3. Open `.env` in your editor and choose one auth mode:
    - default: paste the token into `OD_API_TOKEN=`
    - trusted reverse proxy that already authenticates every request: leave `OD_API_TOKEN=` empty and set `OPEN_DESIGN_DISABLE_API_AUTH=1`
+   - Docker port publishing (Docker Desktop / any bridge-network compose, including `127.0.0.1`-bound ports): set `OPEN_DESIGN_DISABLE_API_AUTH=1`. The daemon exempts requests whose source address is loopback; Docker NATs browser connections (source becomes the bridge gateway), so with a token set, every browser `/api` call returns 401 and the UI shows empty lists (e.g. "no agents detected"). Keep `OD_API_TOKEN` set anyway as the safety floor for future direct non-loopback exposure.
 
 Then pull and start the service:
 
@@ -90,9 +91,12 @@ at startup, so **Settings → Execution mode** should show OpenCode as installed
 and it can be selected as the agent for runs.
 
 ```bash
+# In the running compose container (service name: open-design):
 docker exec open-design opencode --version
-# or one-shot:
-docker run --rm --entrypoint opencode ghcr.io/nexu-io/od:latest --version
+
+# Or one-shot, without a running container — set IMAGE to your registry:
+IMAGE=registry.cn-shanghai.aliyuncs.com/tianxiawuhao/open-design-opencode:latest
+docker run --rm --entrypoint opencode "$IMAGE" --version
 ```
 
 Notes:
@@ -103,10 +107,6 @@ Notes:
 - **State and auth.** opencode writes its config/auth/session data under the
   daemon data volume via the image's `XDG_DATA_HOME` / `XDG_CONFIG_HOME` /
   `XDG_CACHE_HOME` env (`/app/.od/...`), so it persists across container
-  recreates with the `open_design_data` volume. Pass provider keys through
-  compose environment (e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or whatever
-  provider opencode is configured for), or mount your own `opencode.json`
-  config.
 - **Other agent CLIs** (Claude Code, Codex, Gemini, …) are still **not**
   bundled. Keep them outside the image, or build a separate private runtime
   layer if a server deployment needs them installed in the container.

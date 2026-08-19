@@ -1,2 +1,6 @@
 *.bak
 .env
+# Host-owned opencode credentials/config mounted into the container
+# (deploy/opencode/auth.json + opencode.json). auth.json holds API keys —
+# never commit it.
+opencode/

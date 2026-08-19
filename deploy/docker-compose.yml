@@ -3,7 +3,7 @@ name: open-design
 services:
   open-design:
     container_name: open-design
-    image: ${OPEN_DESIGN_IMAGE:-ghcr.io/nexu-io/od:latest}
+    image: ${OPEN_DESIGN_IMAGE:-registry.cn-shanghai.aliyuncs.com/tianxiawuhao/open-design-opencode:latest}
     build:
       context: ..
       dockerfile: deploy/Dockerfile
@@ -19,15 +19,32 @@ services:
       OD_DISABLE_API_AUTH: ${OPEN_DESIGN_DISABLE_API_AUTH:-}
       OD_CODEX_SANDBOX: ${OD_CODEX_SANDBOX:-}
     ports:
+      # The container runs a single listener (7456) serving both the API and
+      # the web UI. Publish two host ports — OPEN_DESIGN_PORT (daemon/API,
+      # e.g. 17456) and OPEN_DESIGN_WEB_PORT (web UI, e.g. 17573) — both
+      # forwarding to the same container port. See OPEN_DESIGN_ALLOWED_ORIGINS
+      # in .env.example for the browser-origin allowlist both ports need.
       - "127.0.0.1:${OPEN_DESIGN_PORT:-7456}:7456"
+      - "127.0.0.1:${OPEN_DESIGN_WEB_PORT:-17573}:7456"
     volumes:
       - open_design_data:/app/.od
+      # Host-owned opencode credentials + provider config, bind-mounted read-only
+      # so you can swap them anytime: edit deploy/opencode/*.json on the host,
+      # then `docker compose restart`. Both files must exist or startup fails.
+      # (opencode also keeps its writable db/logs under the volume above; only
+      # auth.json / opencode.json are shadowed by these mounts.)
+      - ./opencode/auth.json:/app/.od/.local/share/opencode/auth.json:ro
+      - ./opencode/opencode.json:/app/.od/.config/opencode/opencode.json:ro
     read_only: true
     tmpfs:
+      # The rootfs is read-only, but the bundled opencode (Bun runtime) and
+      # other agent CLIs write to $HOME at startup (e.g. ~/.local). Give the
+      # open-design user (uid/gid 1001) a writable home. Daemon data still
+      # persists via the open_design_data volume (XDG_* point under /app/.od).
+      - /home/open-design:uid=1001,gid=1001
       - /tmp
     security_opt:
       - no-new-privileges:true
-    mem_limit: ${OPEN_DESIGN_MEM_LIMIT:-384m}
     pids_limit: 256
     healthcheck:
       test:

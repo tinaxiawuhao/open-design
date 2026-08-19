@@ -351,9 +351,12 @@ docker compose up -d
 > OpenCode as installed and selectable for runs:
 >
 > ```bash
+> # In the running compose container (service name: open-design):
 > docker exec open-design opencode --version
-> # or one-shot:
-> docker run --rm --entrypoint opencode ghcr.io/nexu-io/od:latest --version
+>
+> # Or one-shot, without a running container — set IMAGE to your registry:
+> IMAGE=registry.cn-shanghai.aliyuncs.com/tianxiawuhao/open-design-opencode:latest
+> docker run --rm --entrypoint opencode "$IMAGE" --version
 > ```
 >
 > - **Version pinning / upgrades.** The image is built with
@@ -362,13 +365,75 @@ docker compose up -d
 > - **State and auth.** opencode writes its config/auth/session data under the
 >   daemon data volume via the image's `XDG_DATA_HOME` / `XDG_CONFIG_HOME` /
 >   `XDG_CACHE_HOME` env (`/app/.od/...`), so it persists across container
->   recreates with the `open_design_data` volume. Pass provider keys through
->   compose environment (e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or whatever
->   provider opencode is configured for), or mount your own `opencode.json`
->   config.
+>   recreates with the `open_design_data` volume. Provider keys (`auth.json`)
+>   and provider/model config (`opencode.json`) are bind-mounted read-only
+>   from `deploy/opencode/` — edit them on the host and `docker compose
+>   restart`. See "Server deployment" below.
 > - **Other agent CLIs** (Claude Code, Codex, Gemini, …) are still **not**
 >   bundled. Keep them outside the image, or build a separate private runtime
 >   layer if a server deployment needs them installed in the container.
+
+#### Server deployment (Docker)
+
+**1. Configure `deploy/.env`** (copy from `.env.example`):
+
+```bash
+cd deploy
+cp .env.example .env
+openssl rand -hex 32   # generate OD_API_TOKEN
+```
+
+Set at least:
+
+- `OPEN_DESIGN_IMAGE` — your image (e.g. `registry.cn-shanghai.aliyuncs.com/tianxiawuhao/open-design-opencode:latest` or `ghcr.io/nexu-io/od:latest`)
+- `OD_API_TOKEN` — **required** (the image presets `OD_BIND_HOST=0.0.0.0`)
+- `OPEN_DESIGN_DISABLE_API_AUTH=1` — **set when accessing the UI through Docker port publishing**. The daemon exempts loopback peers only; Docker NATs browser connections, so with a token set every browser `/api` call gets 401 and the UI shows empty lists (e.g. "no agents detected"). Keep `OD_API_TOKEN` set as the safety floor for future direct non-loopback exposure.
+- `OPEN_DESIGN_PORT=17456` and `OPEN_DESIGN_WEB_PORT=17573` — two host ports, both forwarded to the container's single listener (API + web UI)
+- `OPEN_DESIGN_ALLOWED_ORIGINS=http://localhost:17456,http://127.0.0.1:17456,http://localhost:17573,http://127.0.0.1:17573`
+
+**2. Configure OpenCode credentials & models** — the image bundles the
+OpenCode CLI (`/usr/local/bin/opencode`). Its API keys and provider/model
+config are bind-mounted from `deploy/opencode/` (git-ignored):
+
+- `deploy/opencode/auth.json` — provider API keys, e.g.:
+  ```json
+  { "cosmo": { "type": "api", "key": "sk-..." }, "deepseek": { "type": "api", "key": "sk-..." } }
+  ```
+- `deploy/opencode/opencode.json` — custom providers/models, e.g. the 卡奥斯
+  (cosmo) OpenAI-compatible provider at `https://gpt.cosmoplat.com/v1` with
+  `cosmo-mind-coder` / `cosmo-mind-turbo` / `cosmo-mind-vl`.
+
+**3. Start**:
+
+```bash
+docker compose up -d
+# open http://localhost:17456 (or http://localhost:17573)
+```
+
+**4. Verify**:
+
+```bash
+curl http://localhost:17456/api/health
+docker exec open-design opencode --version
+```
+
+In the web UI: **Settings → Execution mode → Rescan** — OpenCode should show
+as installed and authenticated, with the cosmo models selectable.
+
+**5. Swap config anytime** — edit the host files and restart (no image
+rebuild):
+
+```bash
+vi deploy/opencode/auth.json
+vi deploy/opencode/opencode.json
+docker compose restart
+```
+
+> `OD_HOST` / `COSMO_API_KEY` from the source-run examples are **not** used by
+> the container; provider keys live in `deploy/opencode/auth.json` or the
+> compose `environment:` block. See
+> [`deploy/README.md`](deploy/README.md#server-deployment-environment) for the
+> full variable reference.
 
 > **macOS users:** If the web UI shows `Authorization: Bearer <OD_API_TOKEN> required`, Docker Desktop bridge networking is the cause. See [Docker Desktop on macOS](deploy/README.md#docker-desktop-on-macos) for the fix.
 
