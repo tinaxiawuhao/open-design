@@ -325,6 +325,18 @@ docker compose up -d
 # 打开 http://localhost:7456
 ```
 
+> **镜像内置 OpenCode CLI。** 镜像捆绑了 OpenCode CLI（`/usr/local/bin/opencode`，针对 Alpine 构建的 musl 版本），开箱即用，无需在宿主机安装或挂载。daemon 启动时自动检测 `PATH` 上的 `opencode`，因此 **设置 → 执行模式** 中应显示 OpenCode 已安装，可直接选作运行 agent：
+>
+> ```bash
+> docker exec open-design opencode --version
+> # 或一次性运行：
+> docker run --rm --entrypoint opencode ghcr.io/nexu-io/od:latest --version
+> ```
+>
+> - **版本固定 / 升级**：镜像默认以 `--build-arg OPENCODE_VERSION=v1.18.18` 构建；用更新的 tag 重新构建即可升级，例如 `docker build -f deploy/Dockerfile --build-arg OPENCODE_VERSION=v1.19.0 .`
+> - **状态与鉴权**：opencode 的配置 / 认证 / 会话数据通过镜像内的 `XDG_DATA_HOME` / `XDG_CONFIG_HOME` / `XDG_CACHE_HOME` 环境变量写入 daemon 数据卷（`/app/.od/...`），容器重建后依然保留（`open_design_data` 卷）。Provider 密钥通过 compose 环境变量传入（如 `ANTHROPIC_API_KEY`、`OPENAI_API_KEY` 等），或挂载你自己的 `opencode.json` 配置。
+> - **其他 Agent CLI**（Claude Code、Codex、Gemini 等）仍未内置，需要时请保留在镜像外，或在私有运行时层另行安装。
+
 ### 🚀 部署到 Sealos
 
 [![Deploy on Sealos](https://sealos.io/Deploy-on-Sealos.svg)](https://sealos.io/products/app-store/open-design/)

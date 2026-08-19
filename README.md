@@ -344,6 +344,32 @@ docker compose up -d
 # open http://localhost:7456
 ```
 
+> **The image bundles the OpenCode CLI.** The image ships OpenCode at
+> `/usr/local/bin/opencode` (a pinned musl build for Alpine), so it works out of
+> the box — no host install or mounting needed. The daemon auto-detects
+> `opencode` on `PATH` at startup, so **Settings → Execution mode** should show
+> OpenCode as installed and selectable for runs:
+>
+> ```bash
+> docker exec open-design opencode --version
+> # or one-shot:
+> docker run --rm --entrypoint opencode ghcr.io/nexu-io/od:latest --version
+> ```
+>
+> - **Version pinning / upgrades.** The image is built with
+>   `--build-arg OPENCODE_VERSION=v1.18.18` by default; rebuild with a newer tag
+>   to upgrade, e.g. `docker build -f deploy/Dockerfile --build-arg OPENCODE_VERSION=v1.19.0 .`
+> - **State and auth.** opencode writes its config/auth/session data under the
+>   daemon data volume via the image's `XDG_DATA_HOME` / `XDG_CONFIG_HOME` /
+>   `XDG_CACHE_HOME` env (`/app/.od/...`), so it persists across container
+>   recreates with the `open_design_data` volume. Pass provider keys through
+>   compose environment (e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or whatever
+>   provider opencode is configured for), or mount your own `opencode.json`
+>   config.
+> - **Other agent CLIs** (Claude Code, Codex, Gemini, …) are still **not**
+>   bundled. Keep them outside the image, or build a separate private runtime
+>   layer if a server deployment needs them installed in the container.
+
 > **macOS users:** If the web UI shows `Authorization: Bearer <OD_API_TOKEN> required`, Docker Desktop bridge networking is the cause. See [Docker Desktop on macOS](deploy/README.md#docker-desktop-on-macos) for the fix.
 
 ### 🚀 Deploy on Sealos

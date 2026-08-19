@@ -6,7 +6,11 @@
 .task
 .od
 .ocd
-node_modules
+# Anchor with ** so nested node_modules is excluded too. On Docker Desktop
+# (Windows) a bare `node_modules` only matches the context root, so nested
+# pnpm junction links under apps/*/node_modules leaked into `COPY apps ./apps`
+# as absolute host-path symlinks and broke the daemon build (tsc missing).
+**/node_modules
 dist
 coverage
 *.log

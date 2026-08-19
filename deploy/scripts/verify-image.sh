@@ -80,7 +80,7 @@ if [[ -z "$opencode_version" ]]; then
 fi
 echo "bundled opencode version: ${opencode_version}"
 
-CONTAINER_ID="$(docker run -d -p 127.0.0.1::7456 "$IMAGE_REF")"
+CONTAINER_ID="$(docker run -d -p 127.0.0.1::7456 -e OD_API_TOKEN=verify-image-token "$IMAGE_REF")"
 runtime_port="$(docker port "$CONTAINER_ID" 7456/tcp | awk -F: '{print $2}')"
 health_code=""
 
